@@ -1,0 +1,29 @@
+# Build dependencies and generated products stay on the developer's machine.
+.cache/
+.jvmdg/
+build/
+dist/
+validation/
+__pycache__/
+*.pyc
+*.log
+*.app/
+*.ipa
+*.mobileprovision
+*.p12
+*.pfx
+*.pem
+*.key
+*.xcuserstate
+xcuserdata/
+validation-host/*.xcodeproj/
+config/signing.local.*
+config/devices.local.*
+.env*
+
+# Runtime data and personally recorded media.
+*.db
+*.db-*
+*.sqlite*
+*.wav
+*.m4a

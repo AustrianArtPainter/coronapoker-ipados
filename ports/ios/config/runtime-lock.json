@@ -1,0 +1,40 @@
+{
+  "desktopProtocolVersion": "25.79",
+  "minimumIOSVersion": "18.0",
+  "javaSourceVersion": 17,
+  "mobivm": {
+    "group": "com.mobidevelop.robovm",
+    "version": "3.0.0-20260924.074901-5",
+    "snapshotDirectory": "3.0.0-SNAPSHOT",
+    "repository": "https://central.sonatype.com/repository/maven-snapshots",
+    "upstreamBranch": "dev/3.0.0",
+    "inspectedBranchCommit": "6d97fcec3112d4da6e1087fd0f0bc670a24e41d8",
+    "artifactCommitRelationship": "not yet verified",
+    "distSHA256": "1c768091b1a5aedbc9274ba3ad4dab003aa02db844496cf35ace7ecae7d6c87d"
+  },
+  "libgdx": "1.14.2",
+  "backgroundHosting": {
+    "executionCondition": "continuous audible playback of the bundled game music",
+    "ownPlayerTimeout": "CHECK when free, otherwise FOLD",
+    "requiresDetachedPhysicalDeviceValidation": true,
+    "validationSummary": "README.md#validation",
+    "observedSeconds": 900.13427825,
+    "scope": "A measured physical iPad session on the hosting-validation build; later input/media fixes were tested separately. No claim of uninterrupted hosting after audio interruption, force-quit or OS termination."
+  },
+  "jvmDowngrader": {
+    "version": "2.0.1",
+    "sha256": "60a5bd57846fb4be1756fb93e6f63b3d9a63c2759a63e763c44553b086326107",
+    "mode": "build-time only; never load code at runtime"
+  },
+  "hostJDK": {
+    "url": "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_aarch64_mac_hotspot_17.0.20.1_1.tar.gz",
+    "sha256": "196d13ba5f10414bef7f6a05a9b3f00edacb18ebacef2b99485db9e2ee18f0e8",
+    "home": ".cache/toolchains/jdk-17.0.20.1+1/Contents/Home"
+  },
+  "upstream": {
+    "repository": "https://github.com/tonikelope/coronapoker",
+    "author": "tonikelope",
+    "tag": "v25.79",
+    "commit": "e2bfc816ef6ffa825404bd80832da283ca391b96"
+  }
+}
