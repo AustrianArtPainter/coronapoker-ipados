@@ -25,6 +25,19 @@ public final class IOSGdxLauncher extends IOSApplication.Delegate {
     private NetworkLobbyGateway lobby;
 
     @Override protected IOSApplication createApplication() {
+        // The opt-in baseline bypasses every game service and asset initializer.
+        if ("1".equals(System.getenv("CP_IOS_BACKEND_PROBE"))) {
+            IOSApplicationConfiguration baseline = new IOSApplicationConfiguration();
+            baseline.orientationLandscape = true; baseline.orientationPortrait = false;
+            baseline.preferredFramesPerSecond = 60; baseline.useAccelerometer = false;
+            baseline.preventScreenDimming = true; baseline.hideHomeIndicator = true;
+            baseline.useAudio = false;
+            return new IOSApplication(new com.tonikelope.coronapoker.ios.BackendBaselineProbe(), baseline) {
+                @Override protected com.badlogic.gdx.backends.iosrobovm.IOSAudio createAudio(IOSApplicationConfiguration ignored) {
+                    return new com.tonikelope.coronapoker.ios.SilentAudio();
+                }
+            };
+        }
         try {
             String previousTemporaryDirectory = System.getProperty("java.io.tmpdir");
             Path temporaryDirectory = IOSPlatform.temporaryDirectory();
@@ -82,6 +95,14 @@ public final class IOSGdxLauncher extends IOSApplication.Delegate {
             config.preferredFramesPerSecond = 60; config.useAccelerometer = false;
             config.preventScreenDimming = false; config.hideHomeIndicator = true;
             config.overrideRingerSwitch = true;
+            if (com.tonikelope.coronapoker.ios.SilentAudio.ENABLED) {
+                config.useAudio = false;
+                return new IOSApplication(new com.tonikelope.coronapoker.ios.IOSDiagnostics(shell), config) {
+                    @Override protected com.badlogic.gdx.backends.iosrobovm.IOSAudio createAudio(IOSApplicationConfiguration ignored) {
+                        return new com.tonikelope.coronapoker.ios.SilentAudio();
+                    }
+                };
+            }
             return new IOSApplication(new com.tonikelope.coronapoker.ios.IOSDiagnostics(shell), config);
         } catch (Throwable failure) {
             com.tonikelope.coronapoker.ios.IOSDiagnostics.failure(failure);

@@ -10,7 +10,7 @@ import java.sql.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 
-/** A test driver outside the unchanged 25.79 desktop jars. */
+/** A test driver outside the unchanged upstream desktop jars. */
 public final class DesktopPeerProbe {
     private static final AtomicInteger endedHands = new AtomicInteger();
     private static final AtomicInteger shuffles = new AtomicInteger();
@@ -42,7 +42,7 @@ public final class DesktopPeerProbe {
                         System.getenv().getOrDefault("CP_DESKTOP_NICK","PC25-QA"), "native-validation", args[1], args[2], null, false, false, null);
                 try (LobbySession lobby = gateway.open(new NewGameRequest(connection, host ? settings.snapshot() : null))
                         .get(30, TimeUnit.SECONDS)) {
-                    System.out.println("{\"phase\":\"lobby\",\"desktopVersion\":\"25.79\",\"mode\":\""+args[0]+"\"}");
+                    System.out.println("{\"phase\":\"lobby\",\"desktopVersion\":\""+com.tonikelope.coronapoker.core.ApplicationMetadata.VERSION+"\",\"mode\":\""+args[0]+"\"}");
                     if (host) {
                         long deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(3);
                         while (lobby.snapshot().participants().size() < 2) {

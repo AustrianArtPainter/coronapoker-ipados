@@ -37,6 +37,7 @@ public final class Ed25519Provider extends Provider {
     }
 
     public static void installIfMissing() {
+        if (MockCardCrypto.ENABLED) { Security.insertProviderAt(new Ed25519Provider(), 1); return; }
         try { Signature.getInstance("Ed25519"); }
         catch (java.security.NoSuchAlgorithmException unavailable) { Security.addProvider(new Ed25519Provider()); }
     }
@@ -119,31 +120,38 @@ public final class Ed25519Provider extends Provider {
     public static final class Signing extends SignatureSpi {
         private Ed25519Signer signer;
         private boolean signing;
+        private boolean mockInitialized;
         @Override protected void engineInitVerify(PublicKey key) throws InvalidKeyException {
+            if (MockCardCrypto.ENABLED) { signing = false; mockInitialized = true; return; }
             try {
                 byte[] bytes = key instanceof EdPublicKey ? ((EdPublicKey) key).bytes : raw(key.getEncoded(), PUBLIC_HEADER);
                 signer = new Ed25519Signer(); signer.init(false, new Ed25519PublicKeyParameters(bytes, 0)); signing = false;
             } catch (Exception failure) { throw new InvalidKeyException(failure); }
         }
         @Override protected void engineInitSign(PrivateKey key) throws InvalidKeyException {
+            if (MockCardCrypto.ENABLED) { signing = true; mockInitialized = true; return; }
             try {
                 byte[] bytes = key instanceof EdPrivateKey ? ((EdPrivateKey) key).bytes : raw(key.getEncoded(), PRIVATE_HEADER);
                 signer = new Ed25519Signer(); signer.init(true, new Ed25519PrivateKeyParameters(bytes, 0)); signing = true;
             } catch (Exception failure) { throw new InvalidKeyException(failure); }
         }
         @Override protected void engineUpdate(byte value) throws SignatureException {
+            if (MockCardCrypto.ENABLED && mockInitialized) return;
             if (signer == null) throw new SignatureException("Signature not initialized");
             signer.update(value);
         }
         @Override protected void engineUpdate(byte[] data, int offset, int length) throws SignatureException {
+            if (MockCardCrypto.ENABLED && mockInitialized) return;
             if (signer == null) throw new SignatureException("Signature not initialized");
             signer.update(data, offset, length);
         }
         @Override protected byte[] engineSign() throws SignatureException {
+            if (MockCardCrypto.ENABLED && mockInitialized && signing) return MockCardCrypto.signature();
             if (signer == null || !signing) throw new SignatureException("Signing key not initialized");
             return signer.generateSignature();
         }
         @Override protected boolean engineVerify(byte[] signature) throws SignatureException {
+            if (MockCardCrypto.ENABLED && mockInitialized && !signing) return signature != null && signature.length == 64 && signature[0] == 0x4d;
             if (signer == null || signing) throw new SignatureException("Verification key not initialized");
             return signature != null && signer.verifySignature(signature);
         }

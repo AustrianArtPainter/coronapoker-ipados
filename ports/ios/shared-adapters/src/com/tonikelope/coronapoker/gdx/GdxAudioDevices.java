@@ -18,7 +18,7 @@ final class GdxAudioDevices {
             elapsed += Math.max(0, delta);
             if (topology != null && elapsed < 1) return false;
             elapsed = 0;
-            List<String> current = Arrays.asList(IOSPlatform.audioOutputs());
+            List<String> current = Arrays.asList(com.tonikelope.coronapoker.ios.SilentAudio.outputs());
             boolean changed = topology != null && !topology.equals(current);
             topology = List.copyOf(current);
             return changed;
@@ -26,15 +26,15 @@ final class GdxAudioDevices {
         boolean outputAvailable() { return topology == null || !topology.isEmpty(); }
     }
     static void refreshCaptureDevicesAsync() {}
-    static boolean hasCaptureDevices() { return IOSPlatform.microphoneInputs().length > 0; }
+    static boolean hasCaptureDevices() { return com.tonikelope.coronapoker.ios.SilentAudio.inputs().length > 0; }
     static boolean topologyHasOutput(List<String> ports) { return ports != null && !ports.isEmpty(); }
     static String outputLabel(Properties properties, GdxGameText text) {
-        String[] ports = IOSPlatform.audioOutputs();
+        String[] ports = com.tonikelope.coronapoker.ios.SilentAudio.outputs();
         return ports.length == 0 ? "iOS audio route" : label(ports[0]);
     }
     static String captureLabel(Properties properties, GdxGameText text) {
         String selected = properties.getProperty(CAPTURE_KEY, "");
-        for (String input : IOSPlatform.microphoneInputs()) if (uid(input).equals(selected)) return label(input);
+        for (String input : com.tonikelope.coronapoker.ios.SilentAudio.inputs()) if (uid(input).equals(selected)) return label(input);
         return text.translate("gdx.settings.audio.default");
     }
     static boolean cycleOutput(Properties properties) { return false; }
@@ -44,7 +44,7 @@ final class GdxAudioDevices {
     static void cycleCapture(Properties properties) { adjustCapture(properties, 1); }
     static void adjustCapture(Properties properties, int direction) {
         List<String> inputs = new ArrayList<>(); inputs.add("");
-        for (String input : IOSPlatform.microphoneInputs()) inputs.add(uid(input));
+        for (String input : com.tonikelope.coronapoker.ios.SilentAudio.inputs()) inputs.add(uid(input));
         int current = inputs.indexOf(properties.getProperty(CAPTURE_KEY, ""));
         int next = Math.floorMod((current < 0 ? 0 : current) + direction, inputs.size());
         String selected = inputs.get(next);

@@ -4,10 +4,11 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+from toolchain import game_version
 
 PORT = Path(__file__).resolve().parents[1]
 ROOT = PORT.parents[1]
-BASELINE = PORT / "validation" / "desktop-source-baseline.json"
+BASELINE = PORT / "validation" / ("desktop-source-baseline-" + game_version() + ".json")
 
 
 def source_files():
@@ -42,7 +43,7 @@ def main():
         if BASELINE.exists():
             raise SystemExit("Baseline already exists; it must not be silently replaced")
         BASELINE.parent.mkdir(parents=True, exist_ok=True)
-        BASELINE.write_text(json.dumps({"protocol": "25.79", "sha256": current}, indent=2) + "\n")
+        BASELINE.write_text(json.dumps({"protocol": game_version(), "sha256": current}, indent=2) + "\n")
         print(json.dumps({"capturedFiles": len(current), "baseline": str(BASELINE)}))
     else:
         expected = json.loads(BASELINE.read_text())["sha256"]

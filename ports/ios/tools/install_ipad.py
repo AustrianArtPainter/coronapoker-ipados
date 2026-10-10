@@ -7,7 +7,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from package_app import package
+from package_app import package, DEFAULT_OUTPUT
 from sign_app import sign
 
 PORT = Path(__file__).resolve().parents[1]
@@ -56,7 +56,7 @@ def main():
             logs / "profile.log")
     sign(APP, TEMPLATE, None)
     if args.package:
-        package(APP, PORT / "dist/CoronaPoker-25.79-iPad-development.ipa")
+        package(APP, DEFAULT_OUTPUT)
     if not args.no_install:
         run(["xcrun", "devicectl", "device", "install", "app", "--device", args.device,
              APP, "--json-output", logs / "device-install.json"], logs / "device-install.log")

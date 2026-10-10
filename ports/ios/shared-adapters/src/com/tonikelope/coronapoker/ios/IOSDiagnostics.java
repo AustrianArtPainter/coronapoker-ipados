@@ -17,12 +17,13 @@ public final class IOSDiagnostics implements ApplicationListener {
     private static volatile Path documents;
     private final ApplicationListener delegate;
     private int frames;
+    private int vertexProbeFrames;
     public IOSDiagnostics(ApplicationListener delegate) { this.delegate = delegate; }
     public static void beginRun() {
         try {
             Path path = documents(); IOSPlatform.protectDirectory(path.toString());
             for (String name : new String[]{"ios-startup-failure.txt", "ios-render-status.txt", "ios-first-frame.png",
-                    "ios-latest-frame.png", "ios-game-events.jsonl", "ios-game-status.json"})
+                    "ios-latest-frame.png", "ios-game-events.jsonl", "ios-game-status.json", "ios-scene-evidence.json"})
                 Files.deleteIfExists(path.resolve(name));
         } catch (Exception failure) { throw new IllegalStateException("Unable to prepare app diagnostics", failure); }
     }
@@ -56,8 +57,12 @@ public final class IOSDiagnostics implements ApplicationListener {
     }
     @Override public void resize(int width, int height) { delegate.resize(width, height); }
     @Override public void render() {
+        long profileStart = IOSPerformance.beginFrame();
+        long sceneStart = com.tonikelope.coronapoker.gdx.IOSFrameEvidence.begin();
+        long applicationAllocation = IOSPerformance.beginAllocation();
         try {
             delegate.render();
+            if (VertexUploadProbe.ENABLED && ++vertexProbeFrames == 120) VertexUploadProbe.run();
             if ("1".equals(System.getenv("CP_IOS_DIAGNOSTICS")) && (++frames == 300 || frames % 1800 == 0)) {
                 Pixmap image = ScreenUtils.getFrameBufferPixmap(0, 0, Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight());
                 String name = frames == 300 ? "ios-first-frame.png" : "ios-latest-frame.png";
@@ -66,8 +71,13 @@ public final class IOSDiagnostics implements ApplicationListener {
                 report("ios-render-status.txt", frames + " native GDX frames; screenshot saved: " + name);
             }
         } catch (Throwable failure) { failure(failure); throw failure; }
+        finally {
+            IOSPerformance.endAllocation("alloc.applicationFrame", applicationAllocation);
+            IOSPerformance.endFrame(profileStart);
+            com.tonikelope.coronapoker.gdx.IOSFrameEvidence.end(sceneStart);
+        }
     }
-    @Override public void pause() { delegate.pause(); }
-    @Override public void resume() { delegate.resume(); }
+    @Override public void pause() { com.tonikelope.coronapoker.gdx.IOSFrameEvidence.suspend(); delegate.pause(); }
+    @Override public void resume() { com.tonikelope.coronapoker.gdx.IOSFrameEvidence.suspend(); delegate.resume(); }
     @Override public void dispose() { delegate.dispose(); }
 }

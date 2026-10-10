@@ -12,7 +12,7 @@ from prepare_runtime import prepare as prepare_runtime
 from prepare_compiler import prepare as prepare_compiler
 from build_sqlite import build as build_sqlite
 from add_app_icon import add_icon
-from toolchain import jdk_home, verify_downloads
+from toolchain import jdk_home, verify_downloads, game_version
 
 PORT = Path(__file__).resolve().parents[1]
 ROOT = PORT.parents[1]
@@ -34,6 +34,7 @@ def main():
     parser.add_argument("--simulator", action="store_true", help="ARM64 iOS Simulator in build/game-simulator")
     parser.add_argument("--sdk-version", help="Override the SDK version; default is the selected Xcode SDK")
     args = parser.parse_args()
+    version = game_version()
     verify_downloads()
     (PORT / "validation").mkdir(parents=True, exist_ok=True)
     if args.simulator: BUILD = PORT / "build/game-simulator"
@@ -49,7 +50,7 @@ def main():
         DOWNLOADS / "bcprov-jdk18on-1.86.jar",
         DOWNLOADS / "gdx-backend-robovm-metalangle-1.14.2.jar",
         *[SDK / "lib" / name for name in ["robovm-objc.jar", "robovm-cocoatouch.jar", "robovm-bro-bridge.jar"]]]
-    cp = ":".join(map(str, dependencies))
+    cp = ":".join(map(str, [*dependencies, SDK / "lib/robovm-rt.jar"]))
     adapters = PORT / "shared-adapters/src"
     overrides = {str(path.relative_to(base)) for base in [adapters, generated]
                  for path in base.rglob("*.java")}
@@ -102,16 +103,16 @@ def main():
     ET.ElementTree(config).write(config_file, encoding="utf-8", xml_declaration=True)
     plist = BUILD / "Info.plist"
     plist.write_bytes(plistlib.dumps({"CFBundleIdentifier":"com.tonikelope.coronapoker.ios", "CFBundleExecutable":"CoronaPoker",
-        "CFBundleName":"CoronaPoker", "CFBundleDisplayName":"CoronaPoker", "CFBundleVersion":"2", "CFBundleShortVersionString":"25.79",
+        "CFBundleName":"CoronaPoker", "CFBundleDisplayName":"CoronaPoker", "CFBundleVersion":"5", "CFBundleShortVersionString":version,
         "CFBundlePackageType":"APPL", "LSRequiresIPhoneOS":True, "MinimumOSVersion":"18.0", "UIDeviceFamily":[1,2], "UILaunchScreen":{},
         "UIFileSharingEnabled":True, "LSSupportsOpeningDocumentsInPlace":True,
         "UIStatusBarHidden":True, "UIViewControllerBasedStatusBarAppearance":False,
-        "UIBackgroundModes":["audio"], "NSLocalNetworkUsageDescription":"与原版 CoronaPoker 25.79 电脑端联机，由本机主持牌局。",
+        "UIBackgroundModes":["audio"], "NSLocalNetworkUsageDescription":f"与原版 CoronaPoker {version} 电脑端联机，由本机主持牌局。",
         "NSMicrophoneUsageDescription":"录制游戏内语音消息，发送给同桌玩家。",
         "UISupportedInterfaceOrientations":["UIInterfaceOrientationLandscapeLeft","UIInterfaceOrientationLandscapeRight"]}))
     temp = BUILD / "tmp-ios"
     temp.mkdir(parents=True, exist_ok=True)
-    assets = ROOT / "modules/coronapoker-assets/target/coronapoker-assets-25.79.jar"
+    assets = ROOT / f"modules/coronapoker-assets/target/coronapoker-assets-{version}.jar"
     bridge = SDK / "lib/robovm-bro-bridge.jar"
     native_dependencies = [native, assets, *[path for path in dependencies if path != bridge], *[DOWNLOADS / name for name in
         ["gdx-platform-1.14.2-natives-ios.jar","gdx-freetype-platform-1.14.2-natives-ios.jar"]]]

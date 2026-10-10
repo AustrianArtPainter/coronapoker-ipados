@@ -7,6 +7,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.IntFunction;
 
 /** GIF87a/89a metadata, LZW and disposal without desktop ImageIO or AWT. */
 public final class PortableGif {
@@ -103,6 +104,12 @@ public final class PortableGif {
 
     public static void decode(byte[] data, int maxWidth, Consumer<Pixels> consumer,
                               BooleanSupplier cancelled) throws IOException {
+        decode(data, maxWidth, consumer, cancelled, byte[]::new);
+    }
+
+    /** Preparation may recycle an RGBA buffer after its consumer releases it. */
+    public static void decode(byte[] data, int maxWidth, Consumer<Pixels> consumer,
+                              BooleanSupplier cancelled, IntFunction<byte[]> acquire) throws IOException {
         if (maxWidth < 1) throw new IllegalArgumentException("maxWidth <= 0");
         Info info = inspect(data);
         float scale = Math.min(1f, maxWidth / (float) info.width());
@@ -112,6 +119,7 @@ public final class PortableGif {
         long elapsed = 0;
         for (Frame frame : info.frames()) {
             if (cancelled.getAsBoolean()) return;
+            long profileStart = IOSPerformance.ENABLED ? System.nanoTime() : 0L;
             int[] previous = frame.disposal() == 3 ? canvas.clone() : null;
             byte[] indices = lzw(data, frame);
             int sourceRow = 0;
@@ -124,7 +132,9 @@ public final class PortableGif {
                 for (int row = 0; row < frame.height(); row++)
                     drawRow(canvas, info.width(), frame, row, indices, row);
             }
-            byte[] rgba = scaleRgba(canvas, info.width(), info.height(), width, height);
+            byte[] rgba = acquire.apply(Math.multiplyExact(Math.multiplyExact(width, height), 4));
+            scaleRgba(canvas, info.width(), info.height(), width, height, rgba);
+            if (IOSPerformance.ENABLED) IOSPerformance.record("gif.decode", System.nanoTime() - profileStart);
             long end = Math.addExact(elapsed, frame.delayMillis());
             consumer.accept(new Pixels(width, height, elapsed, end, rgba));
             elapsed = end;
@@ -205,15 +215,16 @@ public final class PortableGif {
         return output;
     }
 
-    private static byte[] scaleRgba(int[] pixels, int sw, int sh, int width, int height) {
-        byte[] bytes = new byte[Math.multiplyExact(Math.multiplyExact(width, height), 4)];
+    private static void scaleRgba(int[] pixels, int sw, int sh, int width, int height, byte[] bytes) {
+        if (bytes.length != Math.multiplyExact(Math.multiplyExact(width, height), 4))
+            throw new IllegalArgumentException("Incorrect GIF output buffer size");
         if (sw == width && sh == height) {
             for (int i = 0; i < pixels.length; i++) {
                 int color = pixels[i], offset = i * 4;
                 bytes[offset] = (byte) (color >>> 16); bytes[offset + 1] = (byte) (color >>> 8);
                 bytes[offset + 2] = (byte) color; bytes[offset + 3] = (byte) (color >>> 24);
             }
-            return bytes;
+            return;
         }
         for (int y = 0; y < height; y++) {
             double sy = Math.max(0, Math.min(sh - 1, (y + 0.5) * sh / height - 0.5));
@@ -233,10 +244,10 @@ public final class PortableGif {
                 double b = (c0 & 255) * a0 + (c1 & 255) * a1 + (c2 & 255) * a2 + (c3 & 255) * a3;
                 int offset = (y * width + x) * 4;
                 if (alpha > 0) { bytes[offset] = (byte) Math.round(r / alpha); bytes[offset + 1] = (byte) Math.round(g / alpha); bytes[offset + 2] = (byte) Math.round(b / alpha); }
+                else { bytes[offset] = bytes[offset + 1] = bytes[offset + 2] = 0; }
                 bytes[offset + 3] = (byte) Math.round(alpha);
             }
         }
-        return bytes;
     }
     private PortableGif() {}
 }

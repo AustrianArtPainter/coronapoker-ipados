@@ -37,7 +37,7 @@ public final class GdxTableRenderer implements TableRenderer {
         projection = new BackgroundProjection<>(event -> {
             state.apply(event);
             IOSGameValidation.event(event, state);
-            if (event instanceof TableVisualEvent.PreparationStatus status) phase = status.phase();
+            phase = preparationAfter(phase, event);
             if (event instanceof TableVisualEvent.DeckChanged change) deck = change.deck();
         }, state::mobileCopy, (event, barrier) -> {
             if (event instanceof TableVisualEvent.CloseTable) {
@@ -72,6 +72,17 @@ public final class GdxTableRenderer implements TableRenderer {
         return projection.publish(event);
     }
     static boolean background() { return background; }
+    static TableVisualEvent.PreparationStatus.Phase preparationAfter(
+            TableVisualEvent.PreparationStatus.Phase current, TableVisualEvent event) {
+        // Match the upstream renderer's terminal READY gate, including a
+        // canonical bootstrap received while UIKit has suspended painting.
+        if (current == TableVisualEvent.PreparationStatus.Phase.READY
+                || event instanceof TableVisualEvent.HotJoinState) {
+            return TableVisualEvent.PreparationStatus.Phase.READY;
+        }
+        return event instanceof TableVisualEvent.PreparationStatus status
+                ? status.phase() : current;
+    }
     static boolean suspendedProjection() {
         synchronized (ACTIVE) {
             for (GdxTableRenderer renderer : ACTIVE)
@@ -113,8 +124,11 @@ public final class GdxTableRenderer implements TableRenderer {
         closingPresented = true;
         CompletableFuture<Void> visual = new CompletableFuture<>();
         transferCompletionAsync(visual, closingResult, COMPLETIONS);
-        try { table.acceptEvent(closingEvent, visual); }
-        catch (Throwable failure) { visual.completeExceptionally(failure); }
+        try { table.mobilePresentClosingSummary(closingEvent, visual); }
+        catch (Throwable failure) {
+            if (IOSGameValidation.ENABLED) IOSGameValidation.failed(failure);
+            visual.completeExceptionally(failure);
+        }
     }
     static void transferCompletionAsync(CompletionStage<Void> source, CompletableFuture<Void> target, Executor executor) {
         source.whenCompleteAsync((ignored, failure) -> {

@@ -4,6 +4,13 @@
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #import <objc/message.h>
 #include <jni.h>
+#include <pthread.h>
+
+JNIEXPORT jint JNICALL Java_com_tonikelope_coronapoker_ios_IOSPlatform_currentThreadQoS(JNIEnv *env, jclass type) {
+    qos_class_t qos = QOS_CLASS_UNSPECIFIED;
+    int error = pthread_get_qos_class_np(pthread_self(), &qos, NULL);
+    return error ? -error : (jint)qos;
+}
 
 static NSString *CPString(JNIEnv *env, jstring value) {
     if (!value) return nil;

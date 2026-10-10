@@ -1,9 +1,22 @@
 """Locations and integrity checks for the explicitly pinned public toolchain."""
 import hashlib
 import json
+import re
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 PORT = Path(__file__).resolve().parents[1]
+
+
+def game_version():
+    """One reviewed version for the wire handshake, assets and app packaging."""
+    version = json.loads((PORT / "config/runtime-lock.json").read_text())["desktopProtocolVersion"]
+    if not re.fullmatch(r"[0-9]+\.[0-9]+", version):
+        raise RuntimeError("Invalid pinned game version")
+    pom = ET.parse(PORT.parents[1] / "pom.xml").getroot()
+    if pom.findtext("{http://maven.apache.org/POM/4.0.0}version") != version:
+        raise RuntimeError("Pinned iOS version and upstream Maven version differ")
+    return version
 
 
 def jdk_home():

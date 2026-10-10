@@ -22,6 +22,11 @@ DEPENDENCIES = [
 paths = [PORT / "build/game/classes", ROOT / "modules/coronapoker-core/target/test-classes",
          ROOT / "modules/coronapoker-gdx/target/test-classes", ROOT / "modules/coronapoker-gdx/target/classes",
          ROOT / "modules/coronapoker-assets/target/classes", *[REPOSITORY / path for path in DEPENDENCIES]]
+# The mobile classes reference RoboVM bridge types even with diagnostics off.
+# Supply their definitions to the host verifier; no native method is invoked.
+runtime = PORT / ".cache/toolchains/robovm-3.0.0-SNAPSHOT/lib"
+paths += [runtime / name for name in ["robovm-rt.jar", "robovm-bro-bridge.jar",
+                                    "robovm-objc.jar", "robovm-cocoatouch.jar"]]
 if any(not path.exists() for path in paths): raise RuntimeError("Missing baseline test dependencies")
 classes = PORT / "build/boundary-tests"
 classes.mkdir(parents=True, exist_ok=True)
@@ -37,4 +42,9 @@ print("Original state/security tests; only the AWT-null clipboard assertion is o
 subprocess.run([str(JAVA / "javac"), "--release", "17", "-cp", cp, "-d", str(classes), str(PORT / "tools/BoundaryTests.java"), str(mobile_test)], check=True)
 subprocess.run([str(JAVA / "java"), "-cp", str(classes) + ":" + cp, "BoundaryTests",
                "com.tonikelope.coronapoker.core.AvatarImageValidatorTest",
+               "com.tonikelope.coronapoker.core.game.HotJoinSnapshotCodecV1Test",
+               "com.tonikelope.coronapoker.core.game.HotJoinVisualEventCodecV1Test",
+               "com.tonikelope.coronapoker.table.TableSnapshotMapperTest",
+               "com.tonikelope.coronapoker.HotJoinPresentationCutoverTest",
+               "com.tonikelope.coronapoker.gdx.GdxTableTerminationWiringTest",
                "com.tonikelope.coronapoker.gdx.GdxTableViewStateTest"], check=True)

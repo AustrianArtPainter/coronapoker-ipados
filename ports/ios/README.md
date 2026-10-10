@@ -1,7 +1,7 @@
-# CoronaPoker 25.79 — native iPadOS port
+# CoronaPoker 25.86 — native iPadOS port
 
 Unofficial port of **[tonikelope/coronapoker](https://github.com/tonikelope/coronapoker)**,
-based on **[v25.79](https://github.com/tonikelope/coronapoker/tree/v25.79)**.
+based on **[v25.86](https://github.com/tonikelope/coronapoker/tree/v25.86)**.
 The original game belongs to tonikelope and its contributors. This fork preserves
 the upstream license, credits and Git history; see [IPADOS-NOTICE.md](../../IPADOS-NOTICE.md).
 
@@ -10,7 +10,7 @@ Apple ID 签名安装。主要目标是 iPad；iPhone 实机验证目前暂停�
 
 ## Features and scope
 
-- 加入原版 **25.79** 电脑端的房间，或在 iPad 本机创建房间。
+- 加入原版 **25.86** 电脑端的房间，或在 iPad 本机创建房间。
 - 在本机离线与原版机器人对战，沿用桌面布局、牌局规则和加密协议。
 - UIKit 系统键盘、输入/退格/完成、长按剪切/粘贴、文件选择头像。
 - 原版格式的语音消息录制、发送和回放；原生截图生成及图片剪贴板。
@@ -18,13 +18,15 @@ Apple ID 签名安装。主要目标是 iPad；iPhone 实机验证目前暂停�
 - 自己的玩家超时仍按原规则：**可以免费 CHECK 就过牌，否则 FOLD**。
   不会替用户自动下注或加注；正常机器人仍使用原版策略。
 
-协议严格匹配 **25.79**。不能把原版最新分支或其他版本直接混用。
+协议严格匹配 **25.86**。不能把原版最新分支或其他版本直接混用。
 当前最低部署目标为 iOS/iPadOS **18.0**，但这只是构建目标；尚未完成
 iOS 18 实机或 iPhone 实机验证。实机结果见下文，不能推广为所有设备保证。
 
 持续音乐播放是已验证的后台执行条件。不要静音、停止音乐或强制退出后仍
 期待设备继续主持。来电、音频会话中断、系统资源限制、设备关机或系统终止
 App 都可能影响后台执行。没有借助外部电脑或服务器接管主持。
+
+当前升级分支为 `ipados-25.86`，尚未推送；下面的分支克隆命令在发布后适用。
 
 ## Build from a fresh checkout
 
@@ -41,7 +43,7 @@ App 都可能影响后台执行。没有借助外部电脑或服务器接管主�
 4. 首次准备需要网络和数 GB 磁盘空间；完整 AOT 编译可能需要较长时间。
 
 ```sh
-git clone --branch ipados-25.79 https://github.com/AustrianArtPainter/coronapoker-ipados.git
+git clone --branch ipados-25.86 https://github.com/AustrianArtPainter/coronapoker-ipados.git
 cd coronapoker-ipados
 python3 ports/ios/tools/bootstrap.py
 python3 ports/ios/tools/build_game.py
@@ -127,7 +129,7 @@ Xcode 生成的配置文件为准。参见 [Apple 的会员与设备测试说明
 ## Architecture
 
 ```text
-Original 25.79 core + libGDX desktop sources (unchanged)
+Original 25.86 core + libGDX desktop sources (unchanged)
     └─ prepare_game_sources.py: reviewed mobile source variants
          + shared-adapters/src: platform implementations
          + launcher/src: native app entry point
@@ -183,7 +185,40 @@ MobiVM 是固定的时间戳 snapshot；仓库不假定远端会永久保留它�
 ## Validation
 
 以下是开发过程中的匿名摘要，原始设备日志、数据库和个人签名制品不公开。
-这些验证分属不同构建阶段，并非同一个最终构建执行了全部测试。
+### 25.86 upgrade verification (2026-10-10)
+
+Pinned to upstream `v25.86`, commit
+`15ddcfc73bdc15ed6da6bd272f9f9211e23d766f`. The desktop peer uses the
+same version; the old 25.79 compatibility target has been superseded.
+
+| Scope | Observed result |
+| --- | --- |
+| Official source parity | 3,432 original source/resource files match upstream v25.86; mobile variants remain generated in the port |
+| Original Maven verification | 935 passed, 1 Windows-only wake-lock test skipped; no failed/error tests in the final full run |
+| Original mobile boundary contracts | 250 passed, including hot-join snapshot, visual event, presentation cutover, mapper and terminal navigation contracts; only the desktop AWT-null clipboard assertion is omitted in the generated test |
+| Selected upstream multiprocess certification | Both FLOP bootstrap and bootstrap-before-renderer-attachment scenarios passed; this does not claim all 21 certification scenarios were rerun |
+| Port regression probes | Scene projection, exact GIF pixels/Pixmap lifetime, retained text, sound ownership, scrolling, text input, clipping and screenshot ownership passed |
+| Physical offline full table | Nine bots and the native local player completed 3 hands with real computation, ALL IN, music and effects; 53 signed actions verified and amount tampering rejected; final funds 100/100 |
+| Physical hot join | Joined the original desktop GUI during a paused FLOP: 3 public cards and WARMING UP were confirmed on the iPad, followed by admission at the next hand boundary; the 2 shared participating hands had identical signed records |
+| Physical performance | 10,475 table frames: P99 16.80 ms, maximum 41.68 ms, 4 intervals over 33.3 ms; user reports performance comparable to the previous build with occasional slight hitch/crackle |
+| Resource/lifecycle invariants | 463 preloaded Pixmaps created/disposed, retained decoded output pixels 0, hot ALL IN uploads 0, hidden table draws 0; five libgc.a hashes unchanged |
+| Physical 25.86 locked hosting | Build 5: 900.02 s, 179 continuous background/music samples; 21 additional observed hands, 24 completed total, 108 identical signed actions; background CHECK 41 / FOLD 10 only; funds 20/20 |
+| 25.86 foreground restore | Build 5 passed after full physical lock and desktop-peer exit: the user confirmed an upright summary, no replay of old animations, and successful log navigation. Terminal UI presentation is separated from state application; retained framebuffer UVs preserve top/bottom orientation. 38 summary-restore and 25 actual SpriteBatch corner checks pass |
+
+The final Maven run used isolated Surefire forks and network diagnostic logging.
+Earlier full runs encountered intermittent address-in-use and warming-peer exit
+timeouts; their logs remain local. A clean final run does not establish those
+upstream tests as deterministic. No upstream test assertions were weakened.
+
+The performance sample is a separate randomized three-hand game, not proof that
+all residual hitches were eliminated. iPhone and iOS 18 physical validation remain
+unfinished. The published branch provides the tested build 5 sources and build
+scripts; private device evidence, databases and personally signed binaries remain
+on the developer's machine.
+
+### Historical 25.79 evidence
+
+下表保留 25.79 移植的历史验证；不能当作 25.86 的验收结果。
 
 | Scope | Observed result |
 | --- | --- |
@@ -210,6 +245,8 @@ export PATH="$JAVA_HOME/bin:$PATH"
 mvn -s ports/ios/config/maven-settings.xml verify
 python3 ports/ios/tools/build_game.py --compile-only
 python3 ports/ios/tools/run_boundary_tests.py
+python3 ports/ios/tools/run_summary_restore_probe.py
+python3 ports/ios/tools/run_surface_orientation_probe.py
 python3 ports/ios/tools/run_text_input_probe.py
 python3 ports/ios/tools/run_scissor_probe.py
 python3 ports/ios/tools/run_screenshot_probe.py

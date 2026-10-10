@@ -1,5 +1,5 @@
 {
-  "desktopProtocolVersion": "25.79",
+  "desktopProtocolVersion": "25.86",
   "minimumIOSVersion": "18.0",
   "javaSourceVersion": 17,
   "mobivm": {
@@ -18,8 +18,10 @@
     "ownPlayerTimeout": "CHECK when free, otherwise FOLD",
     "requiresDetachedPhysicalDeviceValidation": true,
     "validationSummary": "README.md#validation",
-    "observedSeconds": 900.13427825,
-    "scope": "A measured physical iPad session on the hosting-validation build; later input/media fixes were tested separately. No claim of uninterrupted hosting after audio interruption, force-quit or OS termination."
+    "observedSeconds": 900.0177537909913,
+    "scope": "Complete native 25.86 build 5 game on a physical iPad, without debugger: 179 continuous background/music samples over 900.02 seconds; 24 completed hands and 108 identical signed actions with original desktop 25.86. After the peer exited, the user confirmed upright summary restoration, no old animation replay, and log navigation after unlock. Audible game music is required; no uninterrupted-hosting claim after audio interruption, force-quit or OS termination.",
+    "validatedGameVersion": "25.86",
+    "validatedBuild": "5"
   },
   "jvmDowngrader": {
     "version": "2.0.1",
@@ -34,7 +36,7 @@
   "upstream": {
     "repository": "https://github.com/tonikelope/coronapoker",
     "author": "tonikelope",
-    "tag": "v25.79",
-    "commit": "e2bfc816ef6ffa825404bd80832da283ca391b96"
+    "tag": "v25.86",
+    "commit": "15ddcfc73bdc15ed6da6bd272f9f9211e23d766f"
   }
 }

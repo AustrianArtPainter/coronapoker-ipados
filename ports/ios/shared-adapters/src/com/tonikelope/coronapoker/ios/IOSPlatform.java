@@ -5,6 +5,8 @@ import java.nio.file.Path;
 
 /** UIKit/Keychain/microphone boundaries, statically linked into the app. */
 public final class IOSPlatform {
+    /** Read actual QoS on a Foundation compute worker; returns class or negative errno. */
+    public static native int currentThreadQoS();
     public static Path temporaryDirectory() {
         return Path.of(org.robovm.apple.foundation.NSFileManager.getDefaultManager()
                 .getTemporaryDirectory().getPath());

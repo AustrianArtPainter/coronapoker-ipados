@@ -22,6 +22,7 @@ final class IOSGameValidation {
     private static final AtomicBoolean STARTED = new AtomicBoolean();
     private static final AtomicLong EVENTS = new AtomicLong(), HANDS = new AtomicLong(), SHUFFLES = new AtomicLong(), PAYOUTS = new AtomicLong();
     private static volatile String phase = "starting", error = "", latest = "{}";
+    private static volatile String visibleScene = "startup";
     private static volatile long ticks, backgroundTicks, maximumTickGapNanos;
     private static volatile GdxTableViewState state;
     private static volatile LobbySession lobby;
@@ -39,6 +40,7 @@ final class IOSGameValidation {
     static boolean injectOpenRace() {
         return ENABLED && "1".equals(System.getenv("CP_IOS_LIFECYCLE_OPEN_RACE"));
     }
+    static void visibleScene(String scene) { if (ENABLED) visibleScene = scene; }
     static void startOnce(GdxApplicationShell shell, NewGameSessionGateway gateway, DatabaseService db) {
         if (!ENABLED || !STARTED.compareAndSet(false, true)) return;
         worker("coronapoker-ios-game-validation", () -> {
@@ -63,8 +65,18 @@ final class IOSGameValidation {
                 });
                 visible.get(30,TimeUnit.SECONDS); phase = "lobby";
                 if ("offline".equals(MODE)) {
-                    lobby.submit(new LobbyCommand.AddBot()).toCompletableFuture().get(10,TimeUnit.SECONDS);
-                    lobby.submit(new LobbyCommand.AddBot()).toCompletableFuture().get(10,TimeUnit.SECONDS);
+                    int bots = Integer.parseInt(value("CP_IOS_BOTS", "2"));
+                    if (bots < 1 || bots > 9) throw new IllegalArgumentException("Validation bots must be 1..9");
+                    for (int i=0; i<bots; i++) lobby.submit(new LobbyCommand.AddBot()).toCompletableFuture().get(10,TimeUnit.SECONDS);
+                    if ("1".equals(System.getenv("CP_IOS_SCROLL_TEST"))) {
+                        // Test rows only in an isolated offline room. Never send
+                        // fixtures to a room containing another human player.
+                        if (lobby.snapshot().participants().stream().anyMatch(p -> !p.local() && !p.bot()))
+                            throw new IllegalStateException("Scroll fixtures require an offline-only room");
+                        for (int i=1; i<=40; i++) lobby.submit(new LobbyCommand.SendText(
+                                "iPad scroll test " + i + " / 40 — content swipe and scrollbar drag"))
+                                .toCompletableFuture().get(10,TimeUnit.SECONDS);
+                    }
                 }
                 if (!"join".equals(MODE)) {
                     long deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(3);
@@ -76,6 +88,24 @@ final class IOSGameValidation {
                 }
                 TableSession table = lobby.tableSession().toCompletableFuture().get(90,TimeUnit.SECONDS);
                 phase = "table";
+                if ("1".equals(System.getenv("CP_IOS_ALL_IN_QA"))) {
+                    if (!"offline".equals(MODE) || !value("CP_IOS_RUN_ID", "").startsWith("allin-"))
+                        throw new IllegalStateException("Scripted ALL IN is limited to the isolated offline room");
+                    worker("coronapoker-ios-validation-all-in", () -> {
+                        try {
+                            long deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(2);
+                            while (summary == null && System.nanoTime() < deadline) {
+                                GdxTableViewState view = state;
+                                if (view != null && view.actionControls().allInEnabled()) {
+                                    table.commands().submit(new TableCommand.AllIn());
+                                    return; // One QA player action; normal timeout policy is unchanged.
+                                }
+                                Thread.sleep(25);
+                            }
+                        } catch (InterruptedException stopped) { Thread.currentThread().interrupt(); }
+                        catch (Throwable failure) { failed(failure); }
+                    });
+                }
                 int backgroundSeconds = Integer.parseInt(value("CP_IOS_STOP_AFTER_BACKGROUND_SECONDS", "0"));
                 if (backgroundSeconds > 0 && !"join".equals(MODE)) {
                     // QA-only graceful cleanup. The normal game and its timeout
@@ -103,7 +133,9 @@ final class IOSGameValidation {
         String kind = event.getClass().getSimpleName();
         String details = event instanceof TableVisualEvent.PlayerAction action
                 ? ",\"player\":"+quote(action.nickname())+",\"action\":"+quote(action.kind().name())
-                : event instanceof TableVisualEvent.PreparationStatus preparation ? ",\"phase\":"+quote(preparation.phase().name()) : "";
+                : event instanceof TableVisualEvent.PreparationStatus preparation ? ",\"phase\":"+quote(preparation.phase().name())
+                : event instanceof TableVisualEvent.Cinematic cinematic ? ",\"cinematicType\":"+quote(cinematic.type().name())
+                        +",\"asset\":"+quote(cinematic.assetName())+",\"cinematicPhase\":"+quote(cinematic.phase().name()) : "";
         String line = "{\"utcMillis\":" + System.currentTimeMillis() + ",\"sequence\":" + event.sequence()
                 + ",\"type\":" + quote(kind) + ",\"background\":" + GdxTableRenderer.background() + details + "}\n";
         // The dealer interrupts its worker during normal cleanup. File I/O must
@@ -152,16 +184,24 @@ final class IOSGameValidation {
             }
         }
         GdxTableViewState view = state; double total = 0; int hand = 0; long sequence = 0;
+        boolean localWarming = false; int publicFaceUpCards = 0;
         String street = "WAITING";
         if (view != null) {
             total = view.snapshot().pot();
-            for (var player : view.snapshot().players()) total += player.stack();
+            for (var player : view.snapshot().players()) {
+                total += player.stack();
+                if (player.nickname().equals(view.snapshot().localNickname())) localWarming = player.warming();
+            }
+            for (var card : view.snapshot().communityCards()) if (card.faceUp()) publicFaceUpCards++;
             hand=view.handNumber();sequence=view.lastSequence();street=view.snapshot().street().name();
         }
         TableSessionSummary result = summary;
         double stacks = result == null ? 0 : result.balances().stream().mapToDouble(TableSessionSummary.PlayerBalance::finalStack).sum();
         double buyins = result == null ? 0 : result.balances().stream().mapToDouble(TableSessionSummary.PlayerBalance::totalBuyin).sum();
         return "{\"kind\":\"native-java-game\",\"runID\":"+quote(value("CP_IOS_RUN_ID", ""))+",\"mode\":"+quote(MODE)
+                +",\"gameVersion\":"+quote(com.tonikelope.coronapoker.core.ApplicationMetadata.VERSION)
+                +",\"visibleScene\":"+quote(visibleScene)
+                +",\"localWarming\":"+localWarming+",\"publicFaceUpCards\":"+publicFaceUpCards
                 +",\"utcMillis\":"+System.currentTimeMillis()+",\"phase\":"+quote(phase)+",\"error\":"+quote(error)
                 +",\"ticks\":"+ticks+",\"backgroundTicks\":"+backgroundTicks+",\"maximumTickGapSeconds\":"+(maximumTickGapNanos/1_000_000_000d)
                 +",\"background\":"+GdxTableRenderer.background()+",\"musicPlaying\":"+IOSMusic.hasAudiblePlayback()

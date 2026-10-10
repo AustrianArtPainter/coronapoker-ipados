@@ -3,7 +3,10 @@
 .jvmdg/
 build/
 dist/
-validation/
+validation/*
+# Public source hashes are required by the reproducible build. Device evidence
+# and signing records in the same directory remain ignored.
+!validation/desktop-source-baseline-*.json
 __pycache__/
 *.pyc
 *.log

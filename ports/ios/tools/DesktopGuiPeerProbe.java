@@ -55,9 +55,11 @@ public final class DesktopGuiPeerProbe {
         CoronaPokerApplication application=(CoronaPokerApplication)get(shell,"application");
         DatabaseService db=application.service(DatabaseService.class);
         NewGameSessionGateway gateway=(NewGameSessionGateway)get(shell,"sessionGateway");
-        boolean host="host".equals(args[0]);
+        boolean hotJoinHost="host-hotjoin".equals(args[0]);
+        boolean host="host".equals(args[0]) || hotJoinHost;
         if (!host && !"join".equals(args[0])) throw new IllegalArgumentException("Unknown mode");
         NewGameTableDraft settings=new NewGameTableDraft(); settings.setThinkSeconds(10); settings.setRebuy(false);
+        if(hotJoinHost)settings.setBotDifficulty(NewGameTableDraft.BotDifficulty.EASY);
         int hands=Integer.parseInt(args[4]); settings.setHandLimit(hands>0); if(hands>0)settings.setHandLimitCount(hands);
         String password=System.getenv("CP_DESKTOP_ROOM_PASSWORD");
         if(password==null)password="native-validation";
@@ -84,17 +86,57 @@ public final class DesktopGuiPeerProbe {
             onGL(() -> {
                 application.sessionOpened(); set(originalShell,"lobby",lobby);
                 ((GdxFrontendScreen)get(originalShell,"menu")).openLobby(lobby);
+                // This isolated QA window is driven below. Avoid a mouse click
+                // adding a bot or starting it before the real iPad arrives.
+                Gdx.input.setInputProcessor(null);
                 Method await=GdxApplicationShell.class.getDeclaredMethod("awaitTable",LobbySession.class);
                 await.setAccessible(true); await.invoke(originalShell,lobby); return null;
             });
-            System.out.println("{\"phase\":\"lobby\",\"desktopVersion\":\"25.79\",\"originalDesktopGUI\":true,\"mode\":\""+args[0]+"\"}");
+            System.out.println("{\"phase\":\"lobby\",\"desktopVersion\":\""+com.tonikelope.coronapoker.core.ApplicationMetadata.VERSION+"\",\"originalDesktopGUI\":true,\"mode\":\""+args[0]+"\"}");
             if(host) {
+                if(hotJoinHost) {
+                    lobby.submit(new LobbyCommand.AddBot()).toCompletableFuture().get(10,TimeUnit.SECONDS);
+                    lobby.submit(new LobbyCommand.StartGame()).toCompletableFuture().get(30,TimeUnit.SECONDS);
+                    TableSession running=lobby.tableSession().toCompletableFuture().get(90,TimeUnit.SECONDS);
+                    long flopDeadline=System.nanoTime()+TimeUnit.MINUTES.toNanos(3);
+                    while(!onGL(() -> {
+                        CoronaPokerGdxTable current=(CoronaPokerGdxTable)get(originalShell,"table");
+                        if(current==null)return false;
+                        GdxTableViewState view=(GdxTableViewState)get(current,"liveState");
+                        if(view.snapshot().street()==TableSnapshot.Street.FLOP
+                                && current.hasRestingCommunityCards(3,true))return true;
+                        driveHotJoinAction(running,view);
+                        return false;
+                    })) {
+                        if(System.nanoTime()>flopDeadline)throw new TimeoutException("Hot-join host did not reach a resting flop");
+                        Thread.sleep(100);
+                    }
+                    running.commands().submit(new TableCommand.TogglePause());
+                    long pauseDeadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
+                    while(!onGL(() -> {
+                        CoronaPokerGdxTable current=(CoronaPokerGdxTable)get(originalShell,"table");
+                        return current!=null && ((GdxTableViewState)get(current,"liveState")).snapshot().paused();
+                    })) {
+                        if(System.nanoTime()>pauseDeadline)throw new TimeoutException("Hot-join host did not pause");
+                        Thread.sleep(50);
+                    }
+                    System.out.println("{\"phase\":\"hotjoin-ready\",\"street\":\"FLOP\",\"paused\":true,\"publicBoardCards\":3}");
+                }
                 long deadline=System.nanoTime()+TimeUnit.MINUTES.toNanos(3);
-                while(lobby.snapshot().participants().size()<2) {
+                while(lobby.snapshot().participants().stream().noneMatch(p ->
+                        !p.local() && !p.bot() && "IPAD-QA".equals(p.nickname()))) {
                     if(System.nanoTime()>deadline)throw new TimeoutException("iPad did not join"); Thread.sleep(100);
                 }
-                lobby.submit(new LobbyCommand.StartGame()).toCompletableFuture().get(30,TimeUnit.SECONDS);
+                if(hotJoinHost) {
+                    Thread.sleep(TimeUnit.SECONDS.toMillis(Integer.parseInt(System.getenv().getOrDefault("CP_DESKTOP_HOT_JOIN_PAUSE_SECONDS","25"))));
+                    lobby.tableSession().toCompletableFuture().get(10,TimeUnit.SECONDS)
+                            .commands().submit(new TableCommand.TogglePause());
+                    System.out.println("{\"phase\":\"hotjoin-resumed\",\"actualIPadPeer\":true}");
+                } else lobby.submit(new LobbyCommand.StartGame()).toCompletableFuture().get(30,TimeUnit.SECONDS);
             }
+            if(lobby.snapshot().participants().stream().noneMatch(p ->
+                    !p.bot() && "IPAD-QA".equals(p.nickname())))
+                throw new AssertionError("Original desktop test must include the actual iPad peer");
             StringBuilder keys=new StringBuilder();
             for(LobbyParticipant participant:lobby.snapshot().participants()) {
                 byte[] key=participant.identityPublicKey();
@@ -149,6 +191,19 @@ public final class DesktopGuiPeerProbe {
             while(onGL(() -> get(originalShell,"table")!=null)) {
                 if(System.nanoTime()>cleanup)throw new TimeoutException("Desktop GUI did not return to menu");Thread.sleep(100);
             }
+        }
+    }
+    private static void driveHotJoinAction(TableSession session,GdxTableViewState view) {
+        ActionControlState controls=view.actionControls();
+        long sequence=view.actionControlsSequence();
+        // This external desktop QA player may call to reach a public flop.
+        // The iPad's own original timeout CHECK/FOLD policy stays intact.
+        boolean call=controls.callAction()==ActionControlState.CallAction.CALL
+                || controls.callAction()==ActionControlState.CallAction.CHECK;
+        if(sequence!=actionSequence && (call || controls.foldEnabled())) {
+            actionSequence=sequence;
+            session.commands().submit(call
+                    ?new TableCommand.CheckOrCall():new TableCommand.Fold());
         }
     }
     private static void report(DatabaseService db) throws SQLException {

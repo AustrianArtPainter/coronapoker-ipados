@@ -41,7 +41,16 @@
         }
     }
     void mobileSuspendInput() {
+        if (mobilePendingShuffleBarrier != null) mobilePendingShuffleBarrier.complete(null);
+        mobilePendingShuffle = null;
+        mobilePendingShuffleBarrier = null;
         mobileTextHold.cancel();
+        mobileScroll.cancel();
+        mobileUiPressBlocked = false;
+        clearPointerRepeat();
+        chatPointerSelectionDragging = gameLogSelectionDragging = false;
+        quickChatScrollDragging = gameLogScrollDragging = false;
+        settingsDebugScrollDragging = settingsRowScrollDragging = false;
         mobileScreenshotRequest++;
         mobileScreenshotViewerPending = false;
         screenshotRequested = false;
@@ -68,7 +77,7 @@
         liveInitialStackFill = null;
         if (liveCinematic != null) { liveCinematic.animation.dispose(); liveCinematic = null; }
         if (liveShuffle != null) {
-            if (liveShuffle.animation != null) liveShuffle.animation.dispose();
+            // The table retains all preloaded shuffle textures across resume.
             liveShuffle = null;
         }
         if (shuffleSound != null) shuffleSound.stop();

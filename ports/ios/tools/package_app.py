@@ -10,10 +10,11 @@ import subprocess
 import tempfile
 import zipfile
 from pathlib import Path
+from toolchain import game_version
 
 PORT = Path(__file__).resolve().parents[1]
 DEFAULT_APP = PORT / "build/game/CoronaPoker.app"
-DEFAULT_OUTPUT = PORT / "dist/CoronaPoker-25.79-iPad-development.ipa"
+DEFAULT_OUTPUT = PORT / ("dist/CoronaPoker-" + game_version() + "-iPad-development.ipa")
 
 
 def digest(path):
