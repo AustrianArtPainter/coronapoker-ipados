@@ -2,6 +2,7 @@
 package com.tonikelope.coronapoker.core.game;
 
 import com.tonikelope.coronapoker.table.TableSnapshot;
+import com.tonikelope.coronapoker.table.TableSessionSummary;
 import com.tonikelope.coronapoker.table.TableVisualEvent;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -58,6 +59,25 @@ public final class HotJoinVisualEventCodecV1 {
     private static final int REBUY = 25;
     private static final int REBUY_DECISION = 26;
     private static final int INITIAL_STACK_FILL = 27;
+    private static final int SEAT_ROSTER = 28;
+    private static final int PAUSE_STATUS = 29;
+    private static final int TELEMETRY_STATUS = 30;
+    private static final int PLAYER_TIMEOUT = 31;
+    private static final int PLAYER_DEPARTURE = 32;
+    private static final int UNDER_THE_GUN_STATUS = 33;
+    private static final int SWAP_HOLE_CARDS = 34;
+    private static final int TABLE_INFO = 35;
+    private static final int CALL_COST = 36;
+    private static final int IMMEDIATE_REBUY_STATUS = 37;
+    private static final int DECK_CHANGED = 38;
+    private static final int LAST_HAND_STATUS = 39;
+    private static final int HAND_LIMIT_STATUS = 40;
+    private static final int GAME_CONFIGURATION_STATUS = 41;
+    private static final int RUN_IT_TWICE_LOCK_STATUS = 42;
+    private static final int COMMUNICATION_RULES_STATUS = 43;
+    private static final int GAME_CLOCK = 44;
+    private static final int CLOSE_TABLE = 45;
+    private static final int HAND_BOUNDARY = 46;
 
     private HotJoinVisualEventCodecV1() {
     }
@@ -72,9 +92,20 @@ public final class HotJoinVisualEventCodecV1 {
                 if (event instanceof TableVisualEvent.AllInRunoutPause value) {
                     out.writeByte(ALL_IN_PAUSE);
                     out.writeLong(value.durationMillis());
+                } else if (event instanceof TableVisualEvent.HandBoundary value) {
+                    out.writeByte(HAND_BOUNDARY);
+                    out.writeLong(value.handId());
+                    writeEnum(out, value.phase());
+                    writeSnapshot(out, value.snapshot());
                 } else if (event instanceof TableVisualEvent.Shuffle value) {
                     out.writeByte(SHUFFLE);
-                    writeText(out, value.deck());
+                    /*
+                     * The shuffle lifecycle is public, but the selected deck is
+                     * a per-client presentation preference.  A hot-join relay
+                     * must animate the same lifecycle without replacing the
+                     * receiver's deck with the host's local choice.
+                     */
+                    writeText(out, "");
                     writeEnum(out, value.phase());
                 } else if (event instanceof TableVisualEvent.PositionRotation value) {
                     out.writeByte(POSITION_ROTATION);
@@ -228,6 +259,73 @@ public final class HotJoinVisualEventCodecV1 {
                     writeChipTransfers(out, value.transfers());
                     out.writeLong(value.durationMillis());
                     writeText(out, value.soundResource());
+                } else if (event instanceof TableVisualEvent.SeatRoster value) {
+                    out.writeByte(SEAT_ROSTER);
+                    writePublicPlayers(out, value.players());
+                } else if (event instanceof TableVisualEvent.PauseStatus value) {
+                    out.writeByte(PAUSE_STATUS);
+                    out.writeBoolean(value.paused());
+                } else if (event instanceof TableVisualEvent.TelemetryStatus value) {
+                    out.writeByte(TELEMETRY_STATUS);
+                    writeCount(out, value.players().size());
+                    for (TableVisualEvent.PlayerTelemetry player : value.players()) {
+                        writeText(out, player.nickname());
+                        out.writeInt(player.latency());
+                        out.writeInt(player.previousLatency());
+                        out.writeInt(player.reconnectionCount());
+                        out.writeLong(player.measuredAtMillis());
+                    }
+                } else if (event instanceof TableVisualEvent.PlayerTimeout value) {
+                    out.writeByte(PLAYER_TIMEOUT);
+                    writeText(out, value.nickname());
+                    out.writeBoolean(value.timedOut());
+                } else if (event instanceof TableVisualEvent.PlayerDeparture value) {
+                    out.writeByte(PLAYER_DEPARTURE);
+                    writeText(out, value.nickname());
+                    writeText(out, value.label());
+                } else if (event instanceof TableVisualEvent.UnderTheGunStatus value) {
+                    out.writeByte(UNDER_THE_GUN_STATUS);
+                    writeText(out, value.nickname());
+                } else if (event instanceof TableVisualEvent.SwapHoleCards value) {
+                    out.writeByte(SWAP_HOLE_CARDS);
+                    writeText(out, value.nickname());
+                    out.writeBoolean(value.blocking());
+                } else if (event instanceof TableVisualEvent.TableInfo value) {
+                    out.writeByte(TABLE_INFO);
+                    out.writeDouble(value.smallBlind());
+                    out.writeDouble(value.bigBlind());
+                    out.writeInt(value.handNumber());
+                    out.writeInt(value.blindIncreaseInterval());
+                    out.writeInt(value.blindIncreaseType());
+                    out.writeInt(value.blindIncreaseCount());
+                } else if (event instanceof TableVisualEvent.ImmediateRebuyStatus value) {
+                    out.writeByte(IMMEDIATE_REBUY_STATUS);
+                    writeText(out, value.nickname());
+                    out.writeInt(value.amount());
+                } else if (event instanceof TableVisualEvent.LastHandStatus value) {
+                    out.writeByte(LAST_HAND_STATUS);
+                    out.writeBoolean(value.enabled());
+                } else if (event instanceof TableVisualEvent.HandLimitStatus value) {
+                    out.writeByte(HAND_LIMIT_STATUS);
+                    out.writeInt(value.maximumHands());
+                } else if (event instanceof TableVisualEvent.GameConfigurationStatus value) {
+                    out.writeByte(GAME_CONFIGURATION_STATUS);
+                    writeText(out, GameConfigCodecV1.encodeBase64(
+                            value.configuration()));
+                } else if (event instanceof TableVisualEvent.RunItTwiceLockStatus value) {
+                    out.writeByte(RUN_IT_TWICE_LOCK_STATUS);
+                    out.writeBoolean(value.locked());
+                } else if (event instanceof TableVisualEvent.CommunicationRulesStatus value) {
+                    out.writeByte(COMMUNICATION_RULES_STATUS);
+                    out.writeBoolean(value.textToSpeech());
+                    out.writeBoolean(value.voiceMessages());
+                } else if (event instanceof TableVisualEvent.GameClock value) {
+                    out.writeByte(GAME_CLOCK);
+                    out.writeLong(value.playTimeSeconds());
+                } else if (event instanceof TableVisualEvent.CloseTable value) {
+                    out.writeByte(CLOSE_TABLE);
+                    writeSummary(out, value.summary());
+                    writeEnum(out, value.terminalStreet());
                 } else {
                     return Optional.empty();
                 }
@@ -246,7 +344,14 @@ public final class HotJoinVisualEventCodecV1 {
 
     /** Decodes one public event with the receiver's own ordered sequence. */
     public static TableVisualEvent decode(String encoded, long sequence) {
+        return decode(encoded, sequence, "");
+    }
+
+    /** Decodes a public event and localizes any embedded snapshot. */
+    public static TableVisualEvent decode(String encoded, long sequence,
+            String localNickname) {
         Objects.requireNonNull(encoded, "encoded");
+        Objects.requireNonNull(localNickname, "localNickname");
         final byte[] bytes;
         try {
             bytes = Base64.getDecoder().decode(encoded);
@@ -266,6 +371,12 @@ public final class HotJoinVisualEventCodecV1 {
             TableVisualEvent event = switch (in.readUnsignedByte()) {
                 case ALL_IN_PAUSE -> new TableVisualEvent.AllInRunoutPause(
                         sequence, in.readLong());
+                case HAND_BOUNDARY -> new TableVisualEvent.HandBoundary(
+                        sequence, in.readLong(),
+                        readEnum(in,
+                                TableVisualEvent.HandBoundary.Phase.values(),
+                                "hand-boundary phase"),
+                        readSnapshot(in, localNickname));
                 case SHUFFLE -> new TableVisualEvent.Shuffle(sequence,
                         readText(in), readEnum(in,
                                 TableVisualEvent.Shuffle.Phase.values(),
@@ -358,6 +469,51 @@ public final class HotJoinVisualEventCodecV1 {
                 case INITIAL_STACK_FILL -> new TableVisualEvent.InitialStackFill(
                         sequence, readChipTransfers(in), in.readLong(),
                         readText(in));
+                case SEAT_ROSTER -> new TableVisualEvent.SeatRoster(sequence,
+                        readPlayers(in));
+                case PAUSE_STATUS -> new TableVisualEvent.PauseStatus(sequence,
+                        in.readBoolean());
+                case TELEMETRY_STATUS -> new TableVisualEvent.TelemetryStatus(
+                        sequence, readTelemetry(in));
+                case PLAYER_TIMEOUT -> new TableVisualEvent.PlayerTimeout(
+                        sequence, readText(in), in.readBoolean());
+                case PLAYER_DEPARTURE -> new TableVisualEvent.PlayerDeparture(
+                        sequence, readText(in), readText(in));
+                case UNDER_THE_GUN_STATUS ->
+                    new TableVisualEvent.UnderTheGunStatus(sequence,
+                            readText(in));
+                case SWAP_HOLE_CARDS -> new TableVisualEvent.SwapHoleCards(
+                        sequence, readText(in), in.readBoolean());
+                case TABLE_INFO -> new TableVisualEvent.TableInfo(sequence,
+                        finite(in.readDouble(), "small blind"),
+                        finite(in.readDouble(), "big blind"), in.readInt(),
+                        in.readInt(), in.readInt(), in.readInt());
+                case CALL_COST -> new TableVisualEvent.CallCost(sequence,
+                        readText(in), readText(in));
+                case IMMEDIATE_REBUY_STATUS ->
+                    new TableVisualEvent.ImmediateRebuyStatus(sequence,
+                            readText(in), in.readInt());
+                case DECK_CHANGED -> new TableVisualEvent.DeckChanged(sequence,
+                        readText(in));
+                case LAST_HAND_STATUS -> new TableVisualEvent.LastHandStatus(
+                        sequence, in.readBoolean());
+                case HAND_LIMIT_STATUS -> new TableVisualEvent.HandLimitStatus(
+                        sequence, in.readInt());
+                case GAME_CONFIGURATION_STATUS ->
+                    new TableVisualEvent.GameConfigurationStatus(sequence,
+                            readConfiguration(in));
+                case RUN_IT_TWICE_LOCK_STATUS ->
+                    new TableVisualEvent.RunItTwiceLockStatus(sequence,
+                            in.readBoolean());
+                case COMMUNICATION_RULES_STATUS ->
+                    new TableVisualEvent.CommunicationRulesStatus(sequence,
+                            in.readBoolean(), in.readBoolean());
+                case GAME_CLOCK -> new TableVisualEvent.GameClock(sequence,
+                        in.readLong());
+                case CLOSE_TABLE -> new TableVisualEvent.CloseTable(sequence,
+                        readSummary(in), readEnum(in,
+                                TableSnapshot.Street.values(),
+                                "terminal street"));
                 default -> throw new IllegalArgumentException(
                         "Unsupported hot-join visual event");
             };
@@ -398,6 +554,92 @@ public final class HotJoinVisualEventCodecV1 {
         return new TableVisualEvent.PayoutBatch(sequence, transfers,
                 finite(in.readDouble(), "payout pot"),
                 finite(in.readDouble(), "invested amount"));
+    }
+
+    private static List<TableVisualEvent.PlayerTelemetry> readTelemetry(
+            DataInputStream in) throws IOException {
+        int count = readCount(in);
+        ArrayList<TableVisualEvent.PlayerTelemetry> players
+                = new ArrayList<>(count);
+        for (int index = 0; index < count; index++) {
+            players.add(new TableVisualEvent.PlayerTelemetry(readText(in),
+                    in.readInt(), in.readInt(), in.readInt(), in.readLong()));
+        }
+        return List.copyOf(players);
+    }
+
+    private static GameConfigCodecV1.Configuration readConfiguration(
+            DataInputStream in) throws IOException {
+        GameConfigCodecV1.Result decoded = GameConfigCodecV1.decodeBase64(
+                readText(in));
+        if (!decoded.isOk()) {
+            throw new IOException("Invalid relayed game configuration: "
+                    + decoded.error());
+        }
+        return decoded.value();
+    }
+
+    private static void writeSummary(DataOutputStream out,
+            TableSessionSummary summary) throws IOException {
+        writeText(out, summary.localNickname());
+        out.writeInt(summary.handCount());
+        out.writeLong(summary.durationSeconds());
+        out.writeLong(summary.endedAtMillis());
+        writeEnum(out, summary.reason());
+        writeCount(out, summary.balances().size());
+        for (TableSessionSummary.PlayerBalance balance : summary.balances()) {
+            writeText(out, balance.nickname());
+            out.writeDouble(balance.finalStack());
+            out.writeDouble(balance.totalBuyin());
+            out.writeInt(balance.rebuyCount());
+        }
+    }
+
+    private static void writeSnapshot(DataOutputStream out,
+            TableSnapshot snapshot) throws IOException {
+        byte[] payload = Base64.getDecoder().decode(
+                HotJoinSnapshotCodecV1.encode(snapshot));
+        if (payload.length == 0 || payload.length > MAX_BYTES) {
+            throw new IllegalArgumentException(
+                    "Invalid embedded hot-join snapshot size");
+        }
+        out.writeInt(payload.length);
+        out.write(payload);
+    }
+
+    private static TableSnapshot readSnapshot(DataInputStream in,
+            String localNickname) throws IOException {
+        int length = in.readInt();
+        if (length <= 0 || length > MAX_BYTES) {
+            throw new IllegalArgumentException(
+                    "Invalid embedded hot-join snapshot size");
+        }
+        byte[] payload = in.readNBytes(length);
+        if (payload.length != length) {
+            throw new IOException("Truncated embedded hot-join snapshot");
+        }
+        return HotJoinSnapshotCodecV1.decode(
+                Base64.getEncoder().encodeToString(payload), localNickname);
+    }
+
+    private static TableSessionSummary readSummary(DataInputStream in)
+            throws IOException {
+        String localNickname = readText(in);
+        int handCount = in.readInt();
+        long durationSeconds = in.readLong();
+        long endedAtMillis = in.readLong();
+        TableSessionSummary.CloseReason reason = readEnum(in,
+                TableSessionSummary.CloseReason.values(), "close reason");
+        int count = readCount(in);
+        ArrayList<TableSessionSummary.PlayerBalance> balances
+                = new ArrayList<>(count);
+        for (int index = 0; index < count; index++) {
+            balances.add(new TableSessionSummary.PlayerBalance(readText(in),
+                    finite(in.readDouble(), "final stack"),
+                    finite(in.readDouble(), "total buy-in"), in.readInt()));
+        }
+        return new TableSessionSummary(localNickname, handCount,
+                durationSeconds, endedAtMillis, reason, balances);
     }
 
     private static void writePositionTransfers(DataOutputStream out,
@@ -451,6 +693,113 @@ public final class HotJoinVisualEventCodecV1 {
                     finite(in.readDouble(), "chip contribution")));
         }
         return List.copyOf(transfers);
+    }
+
+    /**
+     * A roster change is an ordinary table event and must remain one for a
+     * warming client too.  Rebuilding it from that client's recovery model can
+     * briefly be stale while a second newcomer is joining, so the host relays
+     * its canonical roster through the same ordered presentation stream.
+     * Pocket slots are retained as backs but their values never cross this
+     * public channel.
+     */
+    private static void writePublicPlayers(DataOutputStream out,
+            List<TableSnapshot.PlayerSnapshot> players) throws IOException {
+        writeCount(out, players.size());
+        for (TableSnapshot.PlayerSnapshot player : players) {
+            writeText(out, player.nickname());
+            out.writeDouble(player.stack());
+            out.writeDouble(player.streetBet());
+            out.writeDouble(player.potContribution());
+            out.writeBoolean(player.active());
+            out.writeBoolean(player.spectator());
+            out.writeBoolean(player.exited());
+            out.writeBoolean(player.timedOut());
+            out.writeInt(player.latency());
+            out.writeInt(player.previousLatency());
+            out.writeInt(player.reconnectionCount());
+            out.writeLong(player.telemetryAt());
+            out.writeBoolean(player.winner());
+            out.writeBoolean(player.underTheGun());
+            writeEnum(out, player.position());
+            writeEnum(out, player.decision());
+            writeEnum(out, player.actionKind());
+            writeText(out, player.lastAction());
+            writeText(out, player.handName());
+            writeCards(out, player.holeCards().stream()
+                    .map(HotJoinVisualEventCodecV1::publicCard).toList());
+            out.writeInt(player.buyIn());
+            out.writeInt(player.rebuyCount());
+            out.writeBoolean(player.warming());
+            TableSnapshot.PlayerPresentation presentation
+                    = player.presentation();
+            out.writeBoolean(presentation.showingCards());
+            out.writeBoolean(presentation.partialHand());
+            out.writeFloat(presentation.partialWinPercentage());
+            out.writeBoolean(presentation.resultResolved());
+            writeText(out, presentation.publicHandName());
+            writeIntegers(out, presentation.wonPotIndexes());
+            out.writeBoolean(presentation.returnedSidePot());
+            out.writeBoolean(presentation.showdownHighlightEnabled());
+            writeIntegers(out, presentation.winningHoleCardSlots());
+            writeIntegers(out, presentation.winningCommunityCardSlots());
+            writeEnum(out, presentation.rebuyPhase());
+            out.writeInt(presentation.immediateRebuyAmount());
+            writeText(out, presentation.publicActionLabel());
+        }
+    }
+
+    private static List<TableSnapshot.PlayerSnapshot> readPlayers(
+            DataInputStream in) throws IOException {
+        int count = readCount(in);
+        ArrayList<TableSnapshot.PlayerSnapshot> players
+                = new ArrayList<>(count);
+        for (int index = 0; index < count; index++) {
+            String nickname = readText(in);
+            double stack = finite(in.readDouble(), "player stack");
+            double streetBet = finite(in.readDouble(), "player street bet");
+            double contribution = finite(in.readDouble(),
+                    "player contribution");
+            boolean active = in.readBoolean();
+            boolean spectator = in.readBoolean();
+            boolean exited = in.readBoolean();
+            boolean timedOut = in.readBoolean();
+            int latency = in.readInt();
+            int previousLatency = in.readInt();
+            int reconnections = in.readInt();
+            long telemetryAt = in.readLong();
+            boolean winner = in.readBoolean();
+            boolean underTheGun = in.readBoolean();
+            TableSnapshot.Position position = readEnum(in,
+                    TableSnapshot.Position.values(), "position");
+            TableSnapshot.Decision decision = readEnum(in,
+                    TableSnapshot.Decision.values(), "decision");
+            TableSnapshot.ActionKind actionKind = readEnum(in,
+                    TableSnapshot.ActionKind.values(), "action kind");
+            String lastAction = readText(in);
+            String handName = readText(in);
+            List<TableSnapshot.CardSnapshot> cards = readCards(in);
+            int buyIn = in.readInt();
+            int rebuyCount = in.readInt();
+            boolean warming = in.readBoolean();
+            TableSnapshot.PlayerPresentation presentation
+                    = new TableSnapshot.PlayerPresentation(in.readBoolean(),
+                            in.readBoolean(), in.readFloat(), in.readBoolean(),
+                            readText(in), readIntegers(in), in.readBoolean(),
+                            in.readBoolean(), readIntegers(in),
+                            readIntegers(in), readEnum(in,
+                                    TableSnapshot.RebuyPhase.values(),
+                                    "rebuy phase"), boundedInt(in.readInt(),
+                                    0, Integer.MAX_VALUE,
+                                    "immediate rebuy amount"), readText(in));
+            players.add(new TableSnapshot.PlayerSnapshot(nickname,
+                    stack, streetBet, contribution, active, spectator, exited,
+                    timedOut, latency, previousLatency, reconnections,
+                    telemetryAt, winner, underTheGun, position, decision,
+                    actionKind, lastAction, handName, cards, buyIn,
+                    rebuyCount, warming, presentation));
+        }
+        return List.copyOf(players);
     }
 
     private static TableSnapshot.CardSnapshot publicCard(
@@ -523,6 +872,14 @@ public final class HotJoinVisualEventCodecV1 {
             throw new IllegalArgumentException("Invalid hot-join visual list");
         }
         return count;
+    }
+
+    private static int boundedInt(int value, int minimum, int maximum,
+            String label) {
+        if (value < minimum || value > maximum) {
+            throw new IllegalArgumentException("Invalid hot-join " + label);
+        }
+        return value;
     }
 
     private static void writeText(DataOutputStream out, String value)

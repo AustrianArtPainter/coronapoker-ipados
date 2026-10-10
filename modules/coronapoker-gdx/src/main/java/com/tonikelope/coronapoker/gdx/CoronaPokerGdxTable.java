@@ -3329,6 +3329,21 @@ final class CoronaPokerGdxTable extends ApplicationAdapter {
                     && tablePreference("sonido_conteo", true)) {
                 play(balanceCountSound, 0.74f, 1f);
             }
+        } else if (event instanceof TableVisualEvent.HotJoinState) {
+            /*
+             * HOTJOIN_STATE is an authoritative scene cut-over, not an
+             * incremental animation.  A reconnect can reuse a table while a
+             * local recovery visual is still alive; those transients must not
+             * cover cards supplied by the host snapshot. It also proves that
+             * the remote dealer is already running: keeping the provisional
+             * STARTING_DEALER phase here would leave the preparation modal
+             * blocking an otherwise live table forever.
+             */
+            clearCardPresentationForHotJoin();
+            liveState.apply(event);
+            syncSeatsFromLiveState();
+            applyPreparationPhase(TableVisualEvent.PreparationStatus.Phase.READY);
+            barrier.complete(null);
         } else if (event instanceof TableVisualEvent.LateJoinRequest request) {
             liveState.apply(event);
             screenshotToast = "[" + request.nickname() + "] "
@@ -3346,15 +3361,7 @@ final class CoronaPokerGdxTable extends ApplicationAdapter {
             barrier.complete(null);
         } else if (event instanceof TableVisualEvent.PreparationStatus preparation) {
             liveState.apply(event);
-            TableVisualEvent.PreparationStatus.Phase previous
-                    = preparationPhase;
-            preparationPhase = preparation.phase();
-            if (previous != TableVisualEvent.PreparationStatus.Phase.READY
-                    && preparationPhase
-                    == TableVisualEvent.PreparationStatus.Phase.READY
-                    && Float.isNaN(remoteSeatEntryStartedAt)) {
-                remoteSeatEntryStartedAt = totalTime;
-            }
+            applyPreparationPhase(preparation.phase());
             barrier.complete(null);
         } else if (event instanceof TableVisualEvent.GameClock) {
             liveState.apply(event);
@@ -3858,6 +3865,130 @@ final class CoronaPokerGdxTable extends ApplicationAdapter {
             syncSeatsFromLiveState();
             barrier.complete(null);
         }
+    }
+
+    private void clearCardPresentationForHotJoin() {
+        if (liveShuffle != null) {
+            if (shuffleSound != null) stopShuffleSound();
+            if (liveShuffle.finishBarrier != null
+                    && !liveShuffle.finishBarrier.isDone()) {
+                liveShuffle.finishBarrier.complete(null);
+            }
+            if (liveShuffle.animation != null) {
+                liveShuffle.animation.dispose();
+            }
+            liveShuffle = null;
+        }
+        for (LiveCardFlight flight : liveCardFlights) {
+            if (!flight.barrier.isDone()) flight.barrier.complete(null);
+        }
+        liveCardFlights.clear();
+        if (liveHoleSwap != null && !liveHoleSwap.barrier.isDone()) {
+            liveHoleSwap.barrier.complete(null);
+        }
+        liveHoleSwap = null;
+        if (liveCommunityReveal != null
+                && !liveCommunityReveal.barrier.isDone()) {
+            liveCommunityReveal.barrier.complete(null);
+        }
+        liveCommunityReveal = null;
+        if (liveRabbitReveal != null && !liveRabbitReveal.barrier.isDone()) {
+            liveRabbitReveal.barrier.complete(null);
+        }
+        liveRabbitReveal = null;
+        if (liveHoleReveal != null && !liveHoleReveal.barrier.isDone()) {
+            liveHoleReveal.barrier.complete(null);
+        }
+        liveHoleReveal = null;
+        if (liveHoleFold != null && !liveHoleFold.barrier.isDone()) {
+            liveHoleFold.barrier.complete(null);
+        }
+        liveHoleFold = null;
+        liveHoleDealCount = 0;
+    }
+
+    private void applyPreparationPhase(
+            TableVisualEvent.PreparationStatus.Phase nextPhase) {
+        Objects.requireNonNull(nextPhase, "nextPhase");
+        // READY is terminal for a table instance. A delayed provisional event
+        // must never put the modal/input shield back over a live scene.
+        if (preparationPhase == TableVisualEvent.PreparationStatus.Phase.READY
+                && nextPhase != TableVisualEvent.PreparationStatus.Phase.READY) {
+            return;
+        }
+        TableVisualEvent.PreparationStatus.Phase previous = preparationPhase;
+        preparationPhase = nextPhase;
+        if (previous != TableVisualEvent.PreparationStatus.Phase.READY
+                && preparationPhase
+                == TableVisualEvent.PreparationStatus.Phase.READY
+                && Float.isNaN(remoteSeatEntryStartedAt)) {
+            remoteSeatEntryStartedAt = totalTime;
+        }
+    }
+
+    /** Test oracle for the modal/input gate used by the product renderer. */
+    boolean hasActivePreparationOverlay() {
+        return preparationPhase
+                != TableVisualEvent.PreparationStatus.Phase.READY;
+    }
+
+    /** Test oracle for the exact resting-board branch used by drawLiveCommunityCards. */
+    boolean hasRestingCommunityCards(int count, boolean faceUp) {
+        return hasRestingCommunityCards(0, count, faceUp);
+    }
+
+    boolean hasRestingCommunityCards(int firstSlot, int count,
+            boolean faceUp) {
+        if (liveState == null || firstSlot < 0 || count < 0
+                || firstSlot + count > 5
+                || liveShuffle != null
+                || liveState.snapshot().communityCards().size()
+                < firstSlot + count) {
+            return false;
+        }
+        for (int slot = firstSlot; slot < firstSlot + count; slot++) {
+            TableSnapshot.CardSnapshot card = liveState.snapshot()
+                    .communityCards().get(slot);
+            if (!restingCommunityCardOwnsPointer(card, false,
+                    hasActiveCommunityFlight(slot))
+                    || card.faceUp() != faceUp
+                    || faceUp && card.code().isBlank()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Test oracle for the exact resting-pocket branch used by drawLiveHoleCards. */
+    boolean hasRestingRemoteCardBacks() {
+        if (liveState == null) return false;
+        boolean found = false;
+        for (TableSnapshot.PlayerSnapshot player
+                : liveState.snapshot().players()) {
+            if (player.nickname().equals(liveState.snapshot().localNickname())
+                    || !player.active() || player.spectator()
+                    || player.exited()
+                    || player.decision() == TableSnapshot.Decision.FOLD) {
+                continue;
+            }
+            found = true;
+            if (seatByNickname(player.nickname()) == null
+                    || hasActiveHolePresentation(player.nickname())) {
+                return false;
+            }
+            List<TableSnapshot.CardSnapshot> cards
+                    = liveState.presentedHoleCards(player.nickname());
+            if (cards.size() != 2) return false;
+            for (int slot = 0; slot < 2; slot++) {
+                TableSnapshot.CardSnapshot card = cards.get(slot);
+                if (!isRestingHoleCardVisible(card) || card.faceUp()
+                        || !card.code().isBlank()
+                        || hasActiveHoleFlight(player.nickname(), slot)) {
+                    return false;
+                }
+            }
+        }
+        return found;
     }
 
     private void acceptPayout(TableVisualEvent event,
@@ -7490,7 +7621,7 @@ final class CoronaPokerGdxTable extends ApplicationAdapter {
             return;
         }
         for (Seat seat : seats) {
-            TableVisualEvent.ShowdownHighlight highlight
+            GdxTableViewState.ShowdownHighlightState highlight
                     = liveState.showdownHighlight(seat.name);
             if (highlight == null || !highlight.enabled()) {
                 continue;
@@ -9468,7 +9599,7 @@ final class CoronaPokerGdxTable extends ApplicationAdapter {
         float alpha = rabbitRestingAlpha(rabbitCard,
                 liveRestingCardAlpha(card, nickname, slot, communityCard,
                         placement));
-        TableVisualEvent.ShowdownHighlight highlight = liveShowdownHoverNickname == null
+        GdxTableViewState.ShowdownHighlightState highlight = liveShowdownHoverNickname == null
                 ? null : liveState.showdownHighlight(liveShowdownHoverNickname);
         boolean showdownTint = !rabbitCard && highlight != null && alpha >= 1f;
         if (rabbitCard) {
@@ -9526,7 +9657,7 @@ final class CoronaPokerGdxTable extends ApplicationAdapter {
         if (!card.faceUp()) {
             return card.disabled() ? DISABLED_CARD_ALPHA : 1f;
         }
-        TableVisualEvent.ShowdownHighlight highlight = liveShowdownHoverNickname == null
+        GdxTableViewState.ShowdownHighlightState highlight = liveShowdownHoverNickname == null
                 ? null : liveState.showdownHighlight(liveShowdownHoverNickname);
         Boolean selected;
         if (highlight != null) {
@@ -11562,9 +11693,11 @@ final class CoronaPokerGdxTable extends ApplicationAdapter {
             if (liveShuffle != null) {
                 throw new IllegalStateException("A GDX shuffle is already active");
             }
-            liveDeck = availableDeck(event.deck());
+            String shuffleDeck = event.deck().isBlank()
+                    ? liveDeck : availableDeck(event.deck());
+            liveDeck = availableDeck(shuffleDeck);
             liveState.apply(event);
-            liveShuffle = new LiveShuffle(event.deck(), System.nanoTime(),
+            liveShuffle = new LiveShuffle(liveDeck, System.nanoTime(),
                     liveShuffleAnimationEnabled(),
                     liveShuffleSoundEnabled());
             startLiveShuffleSound(liveShuffle);
@@ -12020,7 +12153,13 @@ final class CoronaPokerGdxTable extends ApplicationAdapter {
 
     private boolean isFolded(int seat) {
         TableSnapshot.PlayerSnapshot player = livePlayer(seats[seat]);
-        return player != null && !player.active();
+        if (player == null) {
+            return false;
+        }
+        return shouldDimSeat(player.active(),
+                hasSettledPresentation(liveState.hasHandResult(player.nickname()),
+                        liveState.resolvedHandWinner(player.nickname())),
+                liveState.foldedThisHand(player.nickname()));
     }
 
     static boolean hasSettledPresentation(boolean hasHandResult,
@@ -14153,7 +14292,8 @@ final class CoronaPokerGdxTable extends ApplicationAdapter {
                         1f);
             } else {
                 drawScaledFittedCenteredInBox(localOutcomeFont, 0.70f,
-                        localHudIdleMessage(false, true, false, gameText),
+                        localHudIdleMessage(false, true, false, false,
+                                gameText),
                         statusX, actionY + 8f, statusWidth,
                         actionHeight - 16f, WAITING_TURN_TEXT, 1f);
             }
@@ -14189,7 +14329,8 @@ final class CoronaPokerGdxTable extends ApplicationAdapter {
         } else if (localFolded || waitingForTurn || localSpectator) {
             drawScaledFittedCenteredInBox(localOutcomeFont, 0.70f,
                     localHudIdleMessage(localFolded, waitingForTurn,
-                            localSpectator, gameText),
+                            localSpectator, liveLocalPlayer != null
+                                    && liveLocalPlayer.warming(), gameText),
                     statusX, actionY + 8f, statusWidth,
                     actionHeight - 16f, WAITING_TURN_TEXT, 1f);
         } else if (localTurn) {
@@ -14474,12 +14615,14 @@ final class CoronaPokerGdxTable extends ApplicationAdapter {
     }
 
     static String localHudIdleMessage(boolean foldedThisHand,
-            boolean waitingForTurn, boolean spectator, GdxGameText text) {
+            boolean waitingForTurn, boolean spectator, boolean warming,
+            GdxGameText text) {
         if (foldedThisHand) {
             return uppercase(text.translate("action.label.fold"), text);
         }
         if (spectator) {
-            return uppercase(text.translate("player.espectador"), text);
+            return uppercase(text.translate(warming
+                    ? "game.calentando" : "player.espectador"), text);
         }
         return waitingForTurn
                 ? uppercase(text.translate("gdx.table.hud.waiting_turn"), text)
