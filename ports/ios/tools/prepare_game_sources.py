@@ -613,6 +613,14 @@ def prepare():
         raise RuntimeError("Screenshot camera ownership changed")
     text = text.replace(camera, "            case SCREENSHOTS -> mobileCaptureAndViewScreenshot();")
     text = text.replace(final_camera, "        if (action == 4) {\n            mobileCaptureAndViewScreenshot();")
+    # MetalANGLE exposes the framebuffer through GLES. Reuse the upstream
+    # synchronous capture and its asynchronous PNG writer on this backend.
+    text = replace_method(text, "    private void finishScreenshotReadback(", "")
+    text = re.sub(r"^.*(?:private final GdxScreenshotReadback |finishScreenshotReadback\((?:false|true)\);|screenshotReadback\.dispose\(\);).*\n", "", text, flags=re.M)
+    text = text.replace("screenshotRequested && !screenshotReadback.hasPending()", "screenshotRequested")
+    text = re.sub(r"        try \{\n            if \(screenshotReadback\.submit\(file, width, height\)\) return;.*?\n        \}\n(?=        try \{)", "", text, flags=re.S)
+    if "screenshotReadback" in text or "ScreenUtils.getFrameBufferPixels(0, 0, width, height, false)" not in text:
+        raise RuntimeError("Recheck screenshot readback for the mobile GLES backend")
     # v27.90 already flips the bottom-up framebuffer exactly once in its PNG writer.
     def mobile_capture(writer):
         writer = writer.replace("        Thread writer =", "        long mobileRequest = mobileScreenshotRequest;\n        Thread writer =")

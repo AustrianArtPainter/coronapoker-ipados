@@ -61,7 +61,7 @@ def main():
     # Desktop launchers, CEF video document handler and native browser bridge
     # are not runtime dependencies of the UIKit video surface.
     excluded.update("com/tonikelope/coronapoker/gdx/" + name + ".java" for name in (
-        "CardRenderLabLauncher", "PokerVideoPage"))
+        "CardRenderLabLauncher", "PokerVideoPage", "GdxScreenshotReadback"))
     sources = []
     for module in ["coronapoker-core", "coronapoker-gdx"]:
         base = ROOT / "modules" / module / "src/main/java"
