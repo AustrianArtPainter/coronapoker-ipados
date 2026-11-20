@@ -1,6 +1,7 @@
 package com.tonikelope.coronapoker.gdx;
 
 import com.tonikelope.coronapoker.ios.IOSPlatform;
+import com.tonikelope.coronapoker.ios.SilentAudio;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -29,7 +30,7 @@ final class GdxAudioDevices {
         private float elapsed;
 
         OutputHotplugMonitor() {
-            this(() -> Arrays.asList(com.tonikelope.coronapoker.ios.SilentAudio.outputs()),
+            this(() -> Arrays.asList(SilentAudio.outputs()),
                     OUTPUT_DISCOVERY);
         }
         OutputHotplugMonitor(Supplier<List<String>> source, Executor executor) {
@@ -60,7 +61,7 @@ final class GdxAudioDevices {
         boolean outputAvailable() { return outputAvailable; }
     }
     static void refreshCaptureDevicesAsync() {}
-    static boolean hasCaptureDevices() { return com.tonikelope.coronapoker.ios.SilentAudio.inputs().length > 0; }
+    static boolean hasCaptureDevices() { return SilentAudio.inputs().length > 0; }
     static boolean topologyHasOutput(List<String> ports) { return !normalizedTopology(ports).isEmpty(); }
     static boolean outputTopologyChanged(List<String> previous, List<String> current) {
         return !normalizedTopology(previous).equals(normalizedTopology(current));
@@ -69,14 +70,47 @@ final class GdxAudioDevices {
         return ports == null ? List.of() : ports.stream().filter(Objects::nonNull)
                 .map(String::strip).filter(port -> !port.isEmpty()).distinct().sorted().toList();
     }
+    // AVAudioSession exposes the active output route. Users choose a different
+    // output in Control Center. The game can select available microphone inputs.
+    static List<String> outputChoices() {
+        String[] outputs = SilentAudio.outputs();
+        return List.of(outputs.length == 0 ? "" : outputs[0]);
+    }
+    static int selectedOutputIndex(Properties properties) { return 0; }
+    static boolean selectOutput(Properties properties, String device) {
+        if (!outputChoices().contains(device)) return false;
+        applyConfiguredOutput(properties);
+        return true;
+    }
+    static List<String> captureChoices() {
+        List<String> choices = new ArrayList<>();
+        choices.add("");
+        choices.addAll(Arrays.asList(SilentAudio.inputs()));
+        return choices;
+    }
+    private static int selectedInput(List<String> choices, Properties properties) {
+        String selected = properties.getProperty(CAPTURE_KEY, "");
+        for (int i = 1; i < choices.size(); i++) {
+            if (uid(choices.get(i)).equals(selected)) return i;
+        }
+        return 0;
+    }
+    static int selectedCaptureIndex(Properties properties) {
+        return selectedInput(captureChoices(), properties);
+    }
+    static void selectCapture(Properties properties, String port) {
+        String selected = uid(port);
+        if (IOSPlatform.useMicrophone(selected)) properties.setProperty(CAPTURE_KEY, selected);
+    }
+    static String deviceLabel(String port, GdxGameText text) {
+        return port.isEmpty() ? text.translate("gdx.settings.value.system_default") : label(port);
+    }
     static String outputLabel(Properties properties, GdxGameText text) {
-        String[] ports = com.tonikelope.coronapoker.ios.SilentAudio.outputs();
-        return ports.length == 0 ? "iOS audio route" : label(ports[0]);
+        return deviceLabel(outputChoices().get(0), text);
     }
     static String captureLabel(Properties properties, GdxGameText text) {
-        String selected = properties.getProperty(CAPTURE_KEY, "");
-        for (String input : com.tonikelope.coronapoker.ios.SilentAudio.inputs()) if (uid(input).equals(selected)) return label(input);
-        return text.translate("gdx.settings.audio.default");
+        List<String> choices = captureChoices();
+        return deviceLabel(choices.get(selectedInput(choices, properties)), text);
     }
     static boolean cycleOutput(Properties properties) { return false; }
     static boolean adjustOutput(Properties properties, int direction) { return false; }
@@ -84,12 +118,9 @@ final class GdxAudioDevices {
     static boolean outputSelectionChanged(String previous, String restored) { return !Objects.equals(previous, restored); }
     static void cycleCapture(Properties properties) { adjustCapture(properties, 1); }
     static void adjustCapture(Properties properties, int direction) {
-        List<String> inputs = new ArrayList<>(); inputs.add("");
-        for (String input : com.tonikelope.coronapoker.ios.SilentAudio.inputs()) inputs.add(uid(input));
-        int current = inputs.indexOf(properties.getProperty(CAPTURE_KEY, ""));
-        int next = Math.floorMod((current < 0 ? 0 : current) + direction, inputs.size());
-        String selected = inputs.get(next);
-        if (IOSPlatform.useMicrophone(selected)) properties.setProperty(CAPTURE_KEY, selected);
+        List<String> choices = captureChoices();
+        int next = Math.floorMod(selectedInput(choices, properties) + Integer.signum(direction), choices.size());
+        selectCapture(properties, choices.get(next));
     }
     private static String uid(String port) { int split = port.indexOf('\t'); return split < 0 ? port : port.substring(0, split); }
     private static String label(String port) { int split = port.indexOf('\t'); return split < 0 ? port : port.substring(split + 1); }
