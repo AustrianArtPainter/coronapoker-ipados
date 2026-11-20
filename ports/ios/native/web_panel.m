@@ -101,12 +101,23 @@ JNIEXPORT void JNICALL PANEL(evaluate)(JNIEnv *env,jclass cls,jlong key,jstring 
 @property(nonatomic) BOOL loaded;
 @property(nonatomic) BOOL reading;
 @end
+// Google may add tracking parameters or reorder them during normal navigation.
+static NSString *searchParameter(NSURL *url, NSString *name) {
+    NSURLComponents *parts = [NSURLComponents componentsWithURL:url resolvingAgainstBaseURL:NO];
+    parts.percentEncodedQuery = [parts.percentEncodedQuery stringByReplacingOccurrencesOfString:@"+" withString:@"%20"];
+    for (NSURLQueryItem *item in parts.queryItems)
+        if ([item.name isEqual:name]) return item.value;
+    return nil;
+}
 @implementation CPSearchDocument
 - (void)webView:(WKWebView *)web decidePolicyForNavigationAction:(WKNavigationAction *)action
  decisionHandler:(void (^)(WKNavigationActionPolicy))decision {
     NSURL *u=action.request.URL;
-    BOOL local=action.targetFrame.isMainFrame && [u.scheme isEqual:@"https"] && [u.host isEqual:@"www.google.com"]
-        && [u.path isEqual:@"/search"] && [u.query isEqual:self.target.query];
+    BOOL google = [u.scheme isEqual:@"https"] && [u.host isEqual:@"www.google.com"]
+        && (!u.port || u.port.integerValue == 443) && !u.user && !u.password;
+    BOOL sameSearch = [u.path isEqual:@"/search"] && [searchParameter(u,@"q") isEqual:searchParameter(self.target,@"q")]
+        && [(searchParameter(u,@"start") ?: @"0") isEqual:(searchParameter(self.target,@"start") ?: @"0")];
+    BOOL local = action.targetFrame.isMainFrame && google && (sameSearch || [u.path hasPrefix:@"/httpservice/retry/"]);
     if (!local && action.targetFrame.isMainFrame) {
         if ([u.host isEqual:@"consent.google.com"]) self.result=@"consent";
         else if ([u.path hasPrefix:@"/sorry/"]) self.result=@"unusual";
@@ -123,7 +134,10 @@ JNIEXPORT void JNICALL PANEL(evaluate)(JNIEnv *env,jclass cls,jlong key,jstring 
     }
     decision(WKNavigationResponsePolicyAllow);
 }
-- (void)webView:(WKWebView *)web didFinishNavigation:(WKNavigation *)nav { self.loaded=YES; }
+- (void)webView:(WKWebView *)web didStartProvisionalNavigation:(WKNavigation *)nav { self.loaded=NO; }
+- (void)webView:(WKWebView *)web didFinishNavigation:(WKNavigation *)nav {
+    self.loaded=[web.URL.path isEqual:@"/search"];
+}
 - (void)webView:(WKWebView *)web didFailProvisionalNavigation:(WKNavigation *)nav withError:(NSError *)e {
     if (e.code!=NSURLErrorCancelled) self.result=@"unavailable";
 }
@@ -136,6 +150,8 @@ JNIEXPORT void JNICALL GALLERY(openSearch)(JNIEnv *env,jclass cls,jlong owner,js
     onUI(^{
         CPSearchDocument *page=[CPSearchDocument new]; page.target=url;
         WKWebViewConfiguration *cfg=[WKWebViewConfiguration new]; cfg.websiteDataStore=WKWebsiteDataStore.nonPersistentDataStore;
+        cfg.defaultWebpagePreferences.preferredContentMode = WKContentModeDesktop;
+        cfg.applicationNameForUserAgent = @"Version/18.0 Safari/605.1.15";
         page.web=[[WKWebView alloc] initWithFrame:CGRectMake(0,0,1140,700) configuration:cfg];
         page.web.navigationDelegate=page;
         @synchronized(CPSearchDocument.class) {
