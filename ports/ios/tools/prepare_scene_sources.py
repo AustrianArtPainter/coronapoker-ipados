@@ -13,10 +13,13 @@ def _instance_methods(text, replace_method, transform):
 
 
 def prepare_scene(text, replace_method, port):
-    allocation = "                batch = new SpriteBatch(2000);"
+    allocation = "            case 2 -> batch = new SpriteBatch(2000);"
     if text.count(allocation) != 1:
         raise RuntimeError("Scene surface preparation ownership changed")
-    text = text.replace(allocation, allocation + "\n                mobileClosingLayer.prepare(Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight());")
+    text = text.replace(allocation, """            case 2 -> {
+                batch = new SpriteBatch(2000);
+                mobileClosingLayer.prepare(Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight());
+            }""")
     boundary = "        pointerRepeatHits.clear();"
     if text.count(boundary) != 1:
         raise RuntimeError("Scene update/input boundary changed")
@@ -80,11 +83,6 @@ def prepare_scene(text, replace_method, port):
     if text.count("liveCardFaces.clear();") != 3:
         raise RuntimeError("Card texture disposal ownership changed")
     text = text.replace("liveCardFaces.clear();", "liveCardFaces.clear();\n        mobileFaces.clear();")
-    text = replace_method(text, "    static record LocalHudLayout(",
-                          (port / "tools/mobile_scene_hud.java.inc").read_text())
-
-    # Compile base seat geometry only when roster, size or seat ownership
-    # changes; entrance animation modifies the pre-existing nodes every frame.
     def base_seat_geometry(method):
         motion = "                applyRemoteSeatMotion(seats[i], width, height);"
         if method.count(motion) != 1:
@@ -109,11 +107,6 @@ def prepare_scene(text, replace_method, port):
         end = method.index("        drawFittedCentered(finalDetailFont", start)
         method = method[:start] + "        String details = mobileFinalScene.details;\n" + method[end:]
         method = method.replace("String hero = finalSummaryHero(summary.reason(), net, gameText);", "String hero = mobileFinalScene.hero;")
-        start = method.index("            String result = balance.netResult()")
-        end = method.index("            drawFittedCenteredInBox(finalCardResultFont, result", start)
-        method = method[:start] + "            String result = mobileFinalScene.results[index];\n" + method[end:]
-        method = method.replace('uppercase(gameText.translate("balance.fichas")) + " "\n                            + formatAmount(balance.finalStack())', "mobileFinalScene.stacks[index]")
-        method = method.replace('uppercase(gameText.translate("stats.buyin")) + " "\n                            + formatAmount(balance.totalBuyin())', "mobileFinalScene.buyins[index]")
         for value, field in [("0x11151bff", "nameColor"), ("0x707070ff", "neutralColor"), ("0x2c3138ff", "stackColor"), ("0x4e555eff", "buyinColor")]:
             method = method.replace("new Color(" + value + ")", "mobileFinalScene." + field)
         return method
@@ -135,9 +128,9 @@ def prepare_scene(text, replace_method, port):
         }
 '''+method[start:]
     text = replace_method(text, "    private void drawFittedCenteredInBox(", seat_text)
-    text = replace_method(text, "    private void rebuildFonts(", lambda method:
+    text = replace_method(text, "    private void installFontProfile(", lambda method:
         method[:method.index("{")+1]+"\n        mobileClosingLayer.invalidate();"+method[method.index("{")+1:])
-    for signature in ["    private void rebuildFonts(", "    public void dispose()", "    void disposeFailedCreation()"]:
+    for signature in ["    private void installFontProfile(", "    public void dispose()", "    void disposeFailedCreation()"]:
         text = replace_method(text,signature,lambda method:
             method[:method.index("{")+1]+"\n        mobileSeatText.clear();"+method[method.index("{")+1:])
     text = text.replace("shufflePreparation.cancel(true);", "GifFramePreparation.cancel(shufflePreparation);")

@@ -1,10 +1,7 @@
 """Replace only the exact iOS table amount entry; retain its original algorithm."""
 
 ORIGINAL = '''    static String formatAmount(double amount) {
-        return java.math.BigDecimal.valueOf(amount)
-                .setScale(2, java.math.RoundingMode.HALF_UP)
-                .stripTrailingZeros()
-                .toPlainString();
+        return GdxChipAmountText.format(amount);
     }'''
 
 UNCACHED = ORIGINAL.replace("formatAmount(", "mobileUncachedFormatAmount(", 1)

@@ -3,35 +3,6 @@
 # Full old methods intentionally fail closed when an upstream guard, predicate or
 # priority changes. This module does not cache mutable table/lobby decisions.
 REPLACEMENTS = (
-    ("isActionableTurn", '''    static boolean isActionableTurn(TableSnapshot snapshot, String nickname) {
-        if (snapshot == null || nickname == null || nickname.isBlank()
-                || snapshot.paused()
-                || !nickname.equals(snapshot.currentTurnNickname())) {
-            return false;
-        }
-        return snapshot.players().stream()
-                .filter(player -> nickname.equals(player.nickname()))
-                .anyMatch(player -> player.active()
-                && !player.spectator()
-                && !player.exited()
-                && !player.timedOut());
-    }''', '''    static boolean isActionableTurn(TableSnapshot snapshot, String nickname) {
-        if (snapshot == null || nickname == null || nickname.isBlank()
-                || snapshot.paused()
-                || !nickname.equals(snapshot.currentTurnNickname())) {
-            return false;
-        }
-        List<TableSnapshot.PlayerSnapshot> players = snapshot.players();
-        for (int index = 0; index < players.size(); index++) {
-            TableSnapshot.PlayerSnapshot player = players.get(index);
-            if (nickname.equals(player.nickname()) && player.active()
-                    && !player.spectator() && !player.exited()
-                    && !player.timedOut()) {
-                return true;
-            }
-        }
-        return false;
-    }'''),
     ("canKickTimedOutPlayer", '''    private boolean canKickTimedOutPlayer(String nickname) {
         if (!tableHost || liveState == null || tableChat == null
                 || nickname == null || nickname.isBlank()) {
@@ -114,7 +85,7 @@ REPLACEMENTS = (
                 }
             }
         }
-        return nickname != null && nickname.startsWith("CoronaBot$")
+        return BotNickname.isBot(nickname)
                 ? avatarBot : avatarDefault;
     }''', '''    private Texture tableAvatar(String nickname) {
         if (tableChat != null && nickname != null) {
@@ -141,7 +112,7 @@ REPLACEMENTS = (
                 }
             }
         }
-        return nickname != null && nickname.startsWith("CoronaBot$")
+        return BotNickname.isBot(nickname)
                 ? avatarBot : avatarDefault;
     }'''),
 )

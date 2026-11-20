@@ -5,7 +5,6 @@ import json
 import re
 from pathlib import Path
 from prepare_scene_sources import prepare_scene
-from prepare_evaluator_sources import prepare_evaluator
 from prepare_cinematics_sources import prepare_streaming
 from prepare_table_queries import prepare as prepare_table_queries
 from prepare_table_amounts import prepare as prepare_table_amounts
@@ -59,7 +58,7 @@ def prepare_shell_validation_entry(source):
     return source.replace(original, "            if (IOSGameValidation.ENABLED)\n    " + original)
 
 def physical_scissors(source, expected):
-    marker = "Gdx.gl.glScissor("
+    marker = "HdpiUtils.glScissor("
     if source.count(marker) != expected: raise RuntimeError("Clip ownership changed; re-audit pixel units")
     # A normal back buffer and the half-resolution modal capture FBO have
     # different pixel bounds. Use the currently bound GL viewport for both.
@@ -67,9 +66,9 @@ def physical_scissors(source, expected):
 
 def compute_method(source, name, card_crypto=False):
     """Move a pure CPU method body behind the shared two-worker admission gate."""
-    match = re.search(r"^    (?:public|private)(?: static)? [^\n]*\b" + name + r"\(", source, re.M)
-    if not match: raise RuntimeError("Compute entry changed: " + name)
-    signature = source[match.start():match.end()]
+    headers = re.findall(r"^    (?:public|private)(?: static)? [^\n]*?\b" + name + r"\([^(){}]*\)\s*(?:throws [^{}]+)?(?=\{)", source, re.M)
+    if not headers:
+        raise RuntimeError("Compute entry changed: " + name)
     def wrap(method):
         opening = method.index("{")
         header = method[:opening]
@@ -99,7 +98,9 @@ def compute_method(source, name, card_crypto=False):
             probe += '        com.tonikelope.coronapoker.ios.MockCardCrypto.requireReal("' + name + '");\n'
         wrapper = header + "{\n" + probe + "        return com.tonikelope.coronapoker.core.game.GameAsync.compute(() -> mobileCompute_" + name + "(" + arguments + "));\n    }\n\n"
         return wrapper + private_header + method[opening:]
-    return replace_method(source, signature, wrap)
+    for header in headers:
+        source = replace_method(source, header, wrap)
+    return source
 
 def prepare_table_uppercase(text):
     """Keep the original null short circuit and replace only table casing work."""
@@ -141,13 +142,9 @@ def prepare_table_readouts(text):
             return method
         text = replace_method(text, signature, copy)
 
-    text = replace_method(text, "    private void drawLocalHud(", lambda method:
-        change(change(method, "localActionLayout(width)", "mobileReadouts.actions(width)"),
-               "preActionHudLayout(width)", "mobileReadouts.preActions(width)"))
+    # v27.90 already caches the local action and pre-action geometry.
     text = replace_method(text, "    private void handleLiveTableInput(", lambda method:
-        change(change(method, "preActionHudLayout(viewport.getWorldWidth())",
-                      "mobileReadouts.preActions(viewport.getWorldWidth())"),
-               "hudTarget(pointer.x, pointer.y,", "mobileHudTarget(pointer.x, pointer.y,"))
+        change(method, "hudTarget(pointer.x, pointer.y,", "mobileHudTarget(pointer.x, pointer.y,"))
     for signature in [
         "        public boolean touchDown(int screenX, int screenY, int pointerIndex,",
         "        public boolean touchUp(int screenX, int screenY, int pointerIndex,",
@@ -161,14 +158,6 @@ def prepare_table_readouts(text):
                       "mobileReadouts.summaryNav(width, height, index)", 2)
     text = replace_method(text, "    private void mobilePaintFinalSummary()", summary_paint)
 
-    def community(method):
-        for before, after in [
-            ("formatPlayTime(liveState.playTimeSeconds())", "mobileReadouts.clock(liveState.playTimeSeconds())"),
-            ("communityBlindsText(gameText,", "mobileReadouts.blinds(gameText,"),
-            ("communityHandText(gameText,", "mobileReadouts.hand(gameText,")]:
-            method = change(method, before, after)
-        return method
-    text = replace_method(text, "    private void drawCommunityHud(", community)
     for signature in ["    public void dispose()", "    void disposeFailedCreation()"]:
         text = replace_method(text, signature, lambda method:
             method[:method.index("{") + 1] + "\n        mobileReadouts.clear();" + method[method.index("{") + 1:])
@@ -187,7 +176,6 @@ def prepare_frontend_text_items(text):
         ("    private void drawMainMenuQuote(", "new Color(Color.WHITE)", "Color.WHITE"),
         ("    private void pixelSnappedTextInBox(", "new Color(color)", "color"),
         ("    private void text(BitmapFont font,", "new Color(color)", "color"),
-        ("    private void textExactFit(", "new Color(color)", "color"),
         ("    private TextItem fittedTextItem(", "new Color(color)", "color")]:
         def factory(method):
             if method.count("new TextItem(") != 1 or method.count(snapshot) != 1:
@@ -199,17 +187,14 @@ def prepare_frontend_text_items(text):
             ("() -> openNewGame(NewGameConnectionDraft.Mode.CREATE)", 0),
             ("() -> openNewGame(NewGameConnectionDraft.Mode.JOIN)", 1),
             ("this::openStats", 2), ("this::openScreenshotViewer", 3),
-            ("this::openSettings", 4), ("this::toggleLanguage", 5),
-            ("this::openAboutDialog", 6), ("Gdx.app::exit", 7),
+            ("this::openSettings", 4),
+            ("this::openAboutDialog", 6), ("this::requestApplicationExit", 7),
             ("this::showUpdatePrompt", 8)]:
             if method.count(before) != 1:
                 raise RuntimeError("Main-menu callback ownership changed: " + before)
             method = method.replace(before, "mobileMenuAction(" + str(slot) + ")")
-        return change(method, "Rectangle sound = mainMenuSoundBounds();",
-                      "Rectangle sound = mobileMainMenuSoundBounds();")
+        return method
     text = replace_method(text, "    private void drawMainMenu()", menu_actions)
-    text = replace_method(text, "    private void drawSoundControl(", lambda method:
-        change(method, "this::toggleMasterSound", "mobileDrawingMainMenu ? mobileMenuAction(9) : this::toggleMasterSound"))
     text = replace_method(text, "    private void hit(float x,", lambda method:
         change(method, "        Rectangle bounds = clippedSettingsHit(x, y, w, h);", """        if (mobileDrawingMainMenu && !settingsRowsActive) {
             hits.add(mobileMainMenuHit(x, y, w, h, action));
@@ -244,107 +229,8 @@ def prepare():
                         "originalSHA256": hashlib.sha256(original.read_bytes()).hexdigest(),
                         "mobileSHA256": hashlib.sha256(text.encode()).hexdigest()})
 
-    original = CORE / "crypto/Fe25519.java"
-    original_text = original.read_text()
-    # Keep the legacy reduction helper solely for the upstream white-box
-    # adversarial carry test. Production arithmetic uses the pinned BC field.
-    helpers = []
-    for signature in ["    static long[] carryNormalize(", "    private static long sh(",
-                      "    private static long[] addc("]:
-        def capture(body):
-            helpers.append(body)
-            return body
-        replace_method(original_text, signature, capture)
-    header = original_text[:original_text.index("/**")]
-    header += "import org.bouncycastle.math.ec.rfc7748.X25519Field;\n\n"
-    text = header + (PORT / "tools/mobile_field.java.inc").read_text()
-    text += "\n    // Original legacy helper retained for its upstream white-box regression.\n"
-    text += "    private static final long MASK_51 = (1L << 51) - 1;\n"
-    text += "\n\n".join(helpers) + "\n}\n"
-    emit(original, text)
-
-    original = CORE / "crypto/EdwardsPoint.java"
-    text = original.read_text().replace("import java.math.BigInteger;", "import java.math.BigInteger;\nimport org.bouncycastle.math.ec.rfc7748.X25519Field;")
-    text = replace_method(text, "    public EdwardsPoint add(", '''    public EdwardsPoint add(EdwardsPoint q) {
-        MobilePointScratch p = MOBILE_POINT.get();
-        p.load(this); p.add(q); return p.freeze();
-    }''')
-    text = replace_method(text, "    public EdwardsPoint dbl()", '''    public EdwardsPoint dbl() {
-        MobilePointScratch p = MOBILE_POINT.get();
-        p.load(this); p.twice(); return p.freeze();
-    }''')
-    text = replace_method(text, "    public EdwardsPoint scalarMul(", '''    public EdwardsPoint scalarMul(BigInteger s) {
-        if (s.signum() < 0) throw new IllegalArgumentException("scalar must be non-negative");
-        if (s.signum() == 0) return IDENTITY;
-        // Build cached immutable multiples BEFORE borrowing the accumulator:
-        // table construction itself uses add(), on this same thread.
-        EdwardsPoint[] odd = nafTable();
-        MobilePointScratch p = MOBILE_POINT.get();
-        int bits = s.bitLength();
-        if (p.naf.length < bits + 2) p.naf = new int[bits + 2];
-        java.util.Arrays.fill(p.naf, 0, bits + 2, 0);
-        int position = 0, carry = 0, length = 0;
-        // Read the scalar's bits with a carry instead of allocating one
-        // shifted/subtracted BigInteger per bit of the old wNAF ladder.
-        while (position < bits || carry != 0) {
-            int low = s.testBit(position) ? 1 : 0;
-            if (((low + carry) & 1) == 0) {
-                carry = (low + carry) >>> 1;
-                position++;
-                continue;
-            }
-            int window = carry;
-            for (int j = 0; j < 5; j++) if (s.testBit(position + j)) window += 1 << j;
-            int digit = window >= 16 ? window - 32 : window;
-            p.naf[position] = digit;
-            carry = digit < 0 ? 1 : 0;
-            length = position + 1;
-            position += 5;
-        }
-        p.identity();
-        for (int i = length - 1; i >= 0; i--) {
-            p.twice();
-            int digit = p.naf[i];
-            if (digit != 0) p.add(odd[(Math.abs(digit) - 1) >>> 1], digit < 0);
-        }
-        return p.freeze();
-    }''')
-    text = replace_method(text, "    public static EdwardsPoint multiscalarMul(", '''    public static EdwardsPoint multiscalarMul(BigInteger[] scalars, EdwardsPoint[] points) {
-        if (scalars == null || points == null || scalars.length != points.length)
-            throw new IllegalArgumentException("scalars/points length mismatch");
-        int count = points.length;
-        if (count == 0) return IDENTITY;
-        MobilePointScratch p = MOBILE_POINT.get();
-        if (p.scalars.length < count) {
-            p.scalars = new BigInteger[count]; p.tables = new EdwardsPoint[count][];
-        }
-        try {
-            int maxBits = 0;
-            for (int i = 0; i < count; i++) {
-                p.scalars[i] = scalars[i].mod(L);
-                maxBits = Math.max(maxBits, p.scalars[i].bitLength());
-                p.tables[i] = points[i].windowTable();
-            }
-            if (maxBits == 0) return IDENTITY;
-            p.identity();
-            for (int position = ((maxBits + 3) / 4) * 4 - 4; position >= 0; position -= 4) {
-                p.twice(); p.twice(); p.twice(); p.twice();
-                for (int i = 0; i < count; i++) {
-                    BigInteger s = p.scalars[i];
-                    int window = (s.testBit(position + 3) ? 8 : 0) | (s.testBit(position + 2) ? 4 : 0)
-                            | (s.testBit(position + 1) ? 2 : 0) | (s.testBit(position) ? 1 : 0);
-                    if (window != 0) p.add(p.tables[i][window]);
-                }
-            }
-            return p.freeze();
-        } finally {
-            java.util.Arrays.fill(p.scalars, 0, count, null);
-            java.util.Arrays.fill(p.tables, 0, count, null);
-        }
-    }''')
-    text = text[:text.rfind("}")] + (PORT / "tools/mobile_point.java.inc").read_text() + "}\n"
-    emit(original, text)
-
+    # v27.90 keeps field elements in canonical limbs across operations. Compile
+    # its field and point implementations together without the older substitutions.
     # GameAsync executes protocol orchestration, sleeps and clock deadlines.
     # Pure crypto/odds work instead shares one global CPU pool, including the
     # dealer and independent peer verification queue. Capping the old mixed
@@ -403,16 +289,13 @@ def prepare():
     # decision body behind the same two Utility workers as proofs and odds.
     original = CORE / "Bot.java"
     emit(original, compute_method(original.read_text(), "computeRawDecision"))
-    original = ROOT / "modules/coronapoker-core/src/main/java/org/alberta/poker/HandEvaluator.java"
-    emit(original, prepare_evaluator(original.read_text(), replace_method))
-
     original = GDX / "GdxTableViewState.java"
     text = original.read_text()
     declarations = text[:text.index("    GdxTableViewState(TableSnapshot initialState)")]
     declarations = re.sub(r"/\*.*?\*/|//[^\n]*", "", declarations, flags=re.S)
     fields = [entry for entry in re.findall(
         r"private\s+(?:(static)\s+)?(?:(final)\s+)?([\w.<>?, ]+?)\s+(\w+)\s*(?:=[^;]+)?;", declarations, re.S) if not entry[0]]
-    if len(fields) != 52 or not {"snapshot", "nanoTime"}.issubset({field[3] for field in fields}):
+    if len(fields) != 56 or not {"snapshot", "nanoTime"}.issubset({field[3] for field in fields}):
         raise RuntimeError("Projection fields changed; re-audit independent mobile state copy")
     copy = "\n    GdxTableViewState mobileCopy() {\n        GdxTableViewState copy = new GdxTableViewState(snapshot, nanoTime);\n"
     for _, final, field_type, name in fields:
@@ -510,11 +393,13 @@ def prepare():
     temporary = 'temporary = Files.createTempFile("coronapoker-voice-", ".wav");'
     if text.count(temporary) != 1: raise RuntimeError("Voice temporary-file ownership changed")
     text = text.replace(temporary, 'temporary = Files.createTempFile(com.tonikelope.coronapoker.ios.IOSPlatform.temporaryDirectory(), "coronapoker-voice-", ".wav");')
-    queue = "                QUEUE);"
-    if text.count(queue) != 1: raise RuntimeError("Voice playback completion ownership changed")
-    text = text.replace(queue, '''                QUEUE).whenComplete((ignored, failure) -> {
-                    if (failure != null) com.tonikelope.coronapoker.ios.IOSDiagnostics.voiceFailure(failure);
-                });''')
+    completed = "request.completion.whenComplete((unused, error) -> REQUESTS.remove(request));"
+    if text.count(completed) != 1:
+        raise RuntimeError("Voice request owner changed")
+    text = text.replace(completed, """request.completion.whenComplete((unused, error) -> {
+            REQUESTS.remove(request);
+            if (error != null) com.tonikelope.coronapoker.ios.IOSDiagnostics.voiceFailure(error);
+        });""")
     text = text.replace("Gdx.audio.newMusic(", "com.tonikelope.coronapoker.ios.IOSMusic.create(")
     text = replace_method(text, "    private static boolean audioOutputAvailable(", '''    private static boolean audioOutputAvailable() {
         return com.tonikelope.coronapoker.ios.SilentAudio.outputs().length > 0;
@@ -536,6 +421,7 @@ def prepare():
     text = text.replace(intro_rng, "        " + native_rng + " random = new " + native_rng + "(seed);")
     text = text.replace(intro_range, "    private static float randomRange(" + native_rng + " random,")
     text = text.replace("import java.util.SplittableRandom;\n", "")
+    text = text.replace("new SplittableRandom(", "new " + native_rng + "(")
     if "SplittableRandom" in text:
         raise RuntimeError("A new startup random call needs native compatibility review")
     text = physical_scissors(text, 4)
@@ -717,20 +603,18 @@ def prepare():
         raise RuntimeError("Screenshot camera ownership changed")
     text = text.replace(camera, "            case SCREENSHOTS -> mobileCaptureAndViewScreenshot();")
     text = text.replace(final_camera, "        if (action == 4) {\n            mobileCaptureAndViewScreenshot();")
+    # v27.90 already flips the bottom-up framebuffer exactly once in its PNG writer.
     def mobile_capture(writer):
-        # Retain the original render-thread readback and background PNG writer.
-        writer = writer.replace("        int width =", "        long mobileRequest = mobileScreenshotRequest;\n        int width =", 1)
-        png = "                    PixmapIO.writePNG(new FileHandle(file.toFile()), pixmap);"
-        failure = "            } catch (RuntimeException | IOException failure) {\n                result = failedText;"
-        completion = "                Gdx.app.postRunnable(() -> {\n                    screenshotToast = notice;"
-        if writer.count(png) != 1 or writer.count(failure) != 1 or writer.count(completion) != 1:
+        writer = writer.replace("        Thread writer =", "        long mobileRequest = mobileScreenshotRequest;\n        Thread writer =")
+        callback = 'Gdx.app.postRunnable(() -> showTableToast(gameText.translate(\n                        completed ? "gdx.screenshot.saved" : "gdx.screenshot.save_failed")));'
+        if writer.count(callback) != 1:
             raise RuntimeError("Screenshot writer completion changed")
-        # ScreenUtils already flips the readback; the PNG encoder must not
-        # invert it a second time before UIImage receives the file.
-        writer = writer.replace(png, "                    PixmapIO.writePNG(new FileHandle(file.toFile()), pixmap, -1, false);")
-        writer = writer.replace(failure, failure + "\n                failure.printStackTrace(System.err);")
-        return writer.replace(completion, "                Gdx.app.postRunnable(() -> {\n                    if (disposed) return;\n                    mobileScreenshotWritten(mobileRequest, notice.equals(savedText));\n                    screenshotToast = notice;")
-    text = replace_method(text, "    private void captureScreenshot() {", mobile_capture)
+        return writer.replace(callback, """Gdx.app.postRunnable(() -> {
+                    if (disposed) return;
+                    mobileScreenshotWritten(mobileRequest, completed);
+                    showTableToast(gameText.translate(completed ? "gdx.screenshot.saved" : "gdx.screenshot.save_failed"));
+                });""")
+    text = replace_method(text, "    private void writeScreenshot(", mobile_capture)
     for signature in [
         "        public boolean touchDown(int screenX, int screenY, int pointerIndex,\n                int button) {\n",
         "        public boolean touchUp(int screenX, int screenY, int pointerIndex,\n                int button) {\n"]:
@@ -808,7 +692,7 @@ def prepare():
 
     original = GDX / "GdxFrontendScreen.java"
     text = clean_imports(original.read_text(), ["java.awt."])
-    text = physical_scissors(text, 3)
+    text = physical_scissors(text, 1)
     # Production quote reuse, with the original algorithm retained for exact
     # flag 0. Fonts and the original TextItem/draw path retain their ownership.
     def menu_quote_wrap(method):
@@ -859,7 +743,7 @@ def prepare():
             hoverAnimations.put(hoverKey, hoverAmount);''')
     text = replace_method(text, '''    private void themedButton(float x, float y, float w, float h,
             String label, ButtonTone tone, Runnable action, boolean enabled,
-            BitmapFont labelFont)''', reuse_hover_state)
+            BitmapFont labelFont, boolean repeatable)''', reuse_hover_state)
     for signature in ["    private void rebuildFonts(", "    public void dispose()"]:
         text = replace_method(text, signature, lambda method:
             method[:method.index("{") + 1]
@@ -886,8 +770,8 @@ def prepare():
         return lines;
     }
 ''' + "}\n"
-    text = replace_method(text, "    private static Path openAvatarFileDialog(", '''    private static Path openAvatarFileDialog(String title) {
-        return com.tonikelope.coronapoker.ios.IOSPlatform.pickImage();
+    text = replace_method(text, "    private CompletableFuture<Path> chooseAvatarFile(", '''    private CompletableFuture<Path> chooseAvatarFile(String title) {
+        return CompletableFuture.supplyAsync(com.tonikelope.coronapoker.ios.IOSPlatform::pickImage);
     }''')
     text = replace_method(text, "    private void openExternalUri(", '''    private void openExternalUri(URI uri, String failureKey) {
         if (!Gdx.net.openURI(uri.toString())) showToast(gameText.translate(failureKey));
@@ -940,10 +824,6 @@ def prepare():
     text = text.replace(capture, capture + "                    mobileTextHold.begin(pointerIndex, screenX, screenY, System.nanoTime());\n")
     def mobile_frontend_down(method):
         method = method.replace("        pressedHit = null;", "        if (mobileScroll.active() && !mobileScroll.owns(pointerIndex)) return true;\n        pressedHit = null;", 1)
-        scrollbar = "(!blockingModal || settingsOwnsPointer\n                || statsPicker != StatsPicker.NONE || networkBlocksOpen)"
-        if method.count(scrollbar) != 1:
-            raise RuntimeError("Frontend scrollbar modal ownership changed")
-        method = method.replace(scrollbar, scrollbar + " && dropdown == Dropdown.NONE && editMenu == null")
         marker = "        if (editMenu != null) {"
         return method.replace(marker, "        mobileBeginContentScroll(screenX, screenY, pointerIndex, button);\n" + marker, 1)
     text = replace_method(text, "    public boolean touchDown(int screenX, int screenY, int pointerIndex,", mobile_frontend_down)

@@ -48,7 +48,7 @@ def prepare_frontend(text, replace_method):
         sync = "        syncMusicForSurface();"
         felt = "        drawFeltBackground();"
         text_layer = "        shapes.end();\n\n        batch.begin();"
-        tail = "        batch.end();\n\n        if (shieldBackgroundPointer) pointer.set(livePointerX, livePointerY);"
+        tail = "        batch.end();\n\n        if (shieldBackgroundPointer && !videoOwnsHover && !galleryOwnsHover) {"
         keyboard = ("        com.tonikelope.coronapoker.ios.IOSKeyboard.visible(activeField != null);\n"
                     "        com.tonikelope.coronapoker.ios.IOSKeyboard.fit(viewport);\n        mobileUpdateTextHold();")
         ordered(method, (keyboard, font, sync, felt, text_layer, tail))
@@ -58,7 +58,7 @@ def prepare_frontend(text, replace_method):
         method = change(method, text_layer, "        shapes.end();\n\n" + marker("FRONT_TEXT")
                         + "\n        batch.begin();")
         method = change(method, tail, "        batch.end();\n" + marker("FRONT_TAIL")
-                        + "\n\n        if (shieldBackgroundPointer) pointer.set(livePointerX, livePointerY);")
+                        + "\n\n        if (shieldBackgroundPointer && !videoOwnsHover && !galleryOwnsHover) {")
         return wrap(method, "FRONT_KEYBOARD", "SHELL_TAIL")
 
     return replace_method(text, "    public void render()", render)
@@ -72,7 +72,7 @@ def prepare_table(text, replace_method):
         pointer = ("        mobileScene.synchronize(liveState, gameText.language());\n"
                    "        pointer.set(Gdx.input.getX(), Gdx.input.getY());")
         background = "        drawBackground();"
-        tail = "        drawUiLayer();"
+        tail = "        if (!nestedTableModal) drawUiLayer();"
         prelude = "        if (mobileResumeRequired) GdxTableRenderer.resumeAll();\n        mobilePreparePendingShuffle();"
         ordered(method, (prelude, font, pointer, background, tail))
         method = change(method, font, marker("FONT") + "\n" + font + "\n" + marker("TABLE_UPDATE"))

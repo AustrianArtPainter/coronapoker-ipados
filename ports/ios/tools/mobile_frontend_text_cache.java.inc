@@ -64,10 +64,9 @@
                 case 2: result = this::openStats; break;
                 case 3: result = this::openScreenshotViewer; break;
                 case 4: result = this::openSettings; break;
-                case 5: result = this::toggleLanguage; break;
                 case 6: result = this::openAboutDialog; break;
                 // Resolve the active application at invocation, never retain an old Gdx.app.
-                case 7: result = () -> Gdx.app.exit(); break;
+                case 7: result = this::requestApplicationExit; break;
                 case 8: result = this::showUpdatePrompt; break;
                 case 9: result = this::toggleMasterSound; break;
                 default: throw new IllegalArgumentException("Unknown menu action");

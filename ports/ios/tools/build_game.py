@@ -125,7 +125,7 @@ def main():
     ET.ElementTree(config).write(config_file, encoding="utf-8", xml_declaration=True)
     plist = BUILD / "Info.plist"
     plist.write_bytes(plistlib.dumps({"CFBundleIdentifier":"com.tonikelope.coronapoker.ios", "CFBundleExecutable":"CoronaPoker",
-        "CFBundleName":"CoronaPoker", "CFBundleDisplayName":"CoronaPoker", "CFBundleVersion":"22", "CFBundleShortVersionString":version,
+        "CFBundleName":"CoronaPoker", "CFBundleDisplayName":"CoronaPoker", "CFBundleVersion":"23", "CFBundleShortVersionString":version,
         "CPNativeGCSuspendPolicy":args.gc_policy, "CPNativeGCBuildManifestSHA256":gc_manifest_hash or "sdk-original",
         "CFBundlePackageType":"APPL", "LSRequiresIPhoneOS":True, "MinimumOSVersion":"18.0", "UIDeviceFamily":[1,2], "UILaunchScreen":{},
         "UIFileSharingEnabled":True, "LSSupportsOpeningDocumentsInPlace":True,

@@ -1,5 +1,5 @@
 {
-  "desktopProtocolVersion": "26.16",
+  "desktopProtocolVersion": "27.90",
   "minimumIOSVersion": "18.0",
   "javaSourceVersion": 17,
   "mobivm": {
@@ -36,7 +36,7 @@
   "upstream": {
     "repository": "https://github.com/tonikelope/coronapoker",
     "author": "tonikelope",
-    "tag": "v26.16",
-    "commit": "0c0830d3adaccbec5f3f23ba3adc092ec44df8a1"
+    "tag": "v27.90",
+    "commit": "a660e6d305cdc8d3f0677607f272c9079b87eab5"
   }
 }

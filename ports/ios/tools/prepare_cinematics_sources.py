@@ -16,7 +16,7 @@ def prepare_streaming(source, replace_method):
     source = replace_method(source, "    boolean playbackComplete(", lambda method:
         method.replace("        if (failure != null) return true;", """        if (failure != null) return true;
         if (mobilePreparedFrames != null) return Math.max(0L, Math.round(elapsedSeconds * 1000f)) >= durationMs;"""))
-    source = replace_method(source, "    private void upload(", lambda method:
+    source = replace_method(source, "    private void upload(int width, int height, ByteBuffer source)", lambda method:
         method[:method.index("{")+1] + "\n        if (mobileAllInStream) IOSFrameEvidence.allInHotUploads++;" + method[method.index("{")+1:])
     source = replace_method(source, "    public void dispose()", lambda method:
         method.replace("        if (disposed) return;", """        if (disposed) return;
