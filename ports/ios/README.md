@@ -20,9 +20,8 @@ Apple ID 签名安装。主要目标是 iPad；iPhone 实机验证目前暂停�
 - 自己的玩家超时仍按原规则：**可以免费 CHECK 就过牌，否则 FOLD**。
   不会替用户自动下注或加注；正常机器人仍使用原版策略。
 
-协议严格匹配 **27.90**。不能把其他版本直接混用。完成源码生成、主机侧
-边界测试和 iPad 构建验证后，仍需由用户在真机上重新验收听感、锁屏主持、
-解锁恢复、电脑端双向联机、热加入、重购、输入和媒体功能。
+协议严格匹配 **27.90**。不能把其他版本直接混用。27.90 build 23 已在 iPad Pro 11 英寸（M5）上安装并通过玩家试用。
+下文记录了双向联机、锁屏和媒体功能在模拟器上的具体测试范围。
 当前最低部署目标为 iOS/iPadOS **18.0**，但这只是构建目标；尚未完成
 iOS 18 实机或 iPhone 实机验证。实机结果见下文，不能推广为所有设备保证。
 
@@ -30,7 +29,7 @@ iOS 18 实机或 iPhone 实机验证。实机结果见下文，不能推广为�
 期待设备继续主持。来电、音频会话中断、系统资源限制、设备关机或系统终止
 App 都可能影响后台执行。没有借助外部电脑或服务器接管主持。
 
-当前升级分支为 `ipados-27.90`，尚未推送；以下构建命令在当前源码检出的根目录执行。
+当前 iPad 分支为 `ipados-27.90`。以下构建命令在仓库根目录执行。
 
 ## Build from a fresh checkout
 
@@ -431,7 +430,7 @@ python3 ports/ios/tools/test_scene_evidence.py
 
 The iPad simulator played a YouTube video inside the game, displayed statistics from 208 hands across 17 sessions, rendered the 58-page Spanish rulebook, and returned live image-search results. Saving a search result added its preview to the gallery's favorites.
 
-The simulator joined an unmodified 27.90 desktop core for one completed hand. With the simulator hosting, the same desktop core completed two hands and recorded two signed actions. During that run the simulator entered the background with music playing and resumed to the two-hand summary after unlock. The adapted game's 245 cryptography tests passed on the host JVM. Perceived audio and frame pacing on the physical iPad remain part of user acceptance.
+The simulator joined an unmodified 27.90 desktop core for one completed hand. With the simulator hosting, the same desktop core completed two hands and recorded two signed actions. During that run the simulator entered the background with music playing and resumed to the two-hand summary after unlock. The adapted game's 245 cryptography tests passed on the host JVM. The tester subsequently opened build 23 on an 11-inch iPad Pro (M5) and confirmed the iPad version worked in personal use.
 
 ### 26.16 upgrade verification (2026-10-16)
 
