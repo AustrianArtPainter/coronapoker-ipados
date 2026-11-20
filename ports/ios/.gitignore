@@ -1,0 +1,32 @@
+# Build dependencies and generated products stay on the developer's machine.
+.cache/
+.jvmdg/
+build/
+dist/
+validation/*
+# Public source hashes are required by the reproducible build. Device evidence
+# and signing records in the same directory remain ignored.
+!validation/desktop-source-baseline-*.json
+__pycache__/
+*.pyc
+*.log
+*.app/
+*.ipa
+*.mobileprovision
+*.p12
+*.pfx
+*.pem
+*.key
+*.xcuserstate
+xcuserdata/
+validation-host/*.xcodeproj/
+config/signing.local.*
+config/devices.local.*
+.env*
+
+# Runtime data and personally recorded media.
+*.db
+*.db-*
+*.sqlite*
+*.wav
+*.m4a

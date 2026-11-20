@@ -1,0 +1,48 @@
+{
+  "kind": "compatible-mobivm-gc-source-v1",
+  "sourceRelationship": "The inspected MobiVM build recipe pins this fork. The distributed SDK does not declare its native source revision. Checks cover its RVM consumer symbols and this source's layout parity between policies; this is not an exact artifact-source match or a complete private-layout proof against the SDK binary.",
+  "inspectedBuildRecipe": "https://github.com/MobiVM/robovm/blob/6d97fcec3112d4da6e1087fd0f0bc670a24e41d8/compiler/vm/CMakeLists.txt",
+  "gc": {
+    "repository": "https://github.com/MobiVM/bdwgc.git",
+    "commit": "c1e985028101ec710937b6c721d9f79941a15bce",
+    "url": "https://codeload.github.com/MobiVM/bdwgc/tar.gz/c1e985028101ec710937b6c721d9f79941a15bce",
+    "sha256": "7e0c03cac9943ba6dac05809a05515521f9c681d4c22aa3c971252424929ebb9"
+  },
+  "atomicOps": {
+    "repository": "https://github.com/ivmai/libatomic_ops.git",
+    "commit": "4e22546e8a161b6bab93e43c115a22151daf45c5",
+    "url": "https://codeload.github.com/ivmai/libatomic_ops/tar.gz/4e22546e8a161b6bab93e43c115a22151daf45c5",
+    "sha256": "11c8e924df52e0c63e56543a2f33f46f10650b6d63cc8aa5bc3f8a23d9dde952"
+  },
+  "originalLibraries": {
+    "ios": "65c42720bcbd747e584310472b4635eed8424ce0b9f2ee2bb88d855855bd0fbb",
+    "ios-simulator": "8d4e4a06100771244a6a321444322a96ec9c5e88c3163eb4eac0aebf42925b3f"
+  },
+  "targetTriples": {
+    "ios": "arm64-apple-ios8.0",
+    "ios-simulator": "arm64-apple-ios14.0-simulator"
+  },
+  "configureArguments": [
+    "--host=aarch64-apple-darwin7",
+    "--enable-shared=no",
+    "--enable-munmap=1",
+    "--enable-parallel-mark=yes"
+  ],
+  "commonCFlags": [
+    "-O2", "-Wall", "-fPIC", "-DGC_DISABLE_INCREMENTAL",
+    "-DGC_FORCE_UNMAP_ON_GCOLLECT", "-DMARK_DESCR_OFFSET=24",
+    "-Wno-error=incompatible-function-pointer-types", "-Wno-error=int-conversion",
+    "-DGC_MAX_MACH_THREADS=1024", "-DNO_DYLD_BIND_FULLY_IMAGE"
+  ],
+  "registeredPolicyFlag": "-DGC_NO_THREADS_DISCOVERY",
+  "originalPolicyFlag": "-DGC_DISCOVER_TASK_THREADS",
+  "requiredFeatures": ["GC_THREADS", "GC_DARWIN_THREADS", "PARALLEL_MARK", "THREAD_LOCAL_ALLOC", "DARWIN_DONT_PARSE_STACK", "GC_DISABLE_INCREMENTAL"],
+  "layoutFields": ["next", "id", "stop_info", "flags", "thread_blocked", "stack_end", "traced_stack_sect", "tlfs"],
+  "requiredSymbols": [
+    "GC_rvm_apply_to_each_live_object", "GC_rvm_apply_to_each_object",
+    "GC_init", "GC_gcollect", "GC_init_gcj_malloc", "GC_gcj_malloc",
+    "GC_set_java_finalization", "GC_add_roots", "GC_register_my_thread",
+    "GC_unregister_my_thread", "GC_allow_register_threads", "GC_pthread_create",
+    "GC_register_finalizer_no_order", "GC_set_start_callback", "GC_get_parallel"
+  ]
+}

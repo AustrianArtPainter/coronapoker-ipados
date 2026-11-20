@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "files": [
+    {
+      "name": "temurin17-macos-aarch64.tar.gz",
+      "url": "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_aarch64_mac_hotspot_17.0.20.1_1.tar.gz",
+      "sha256": "196d13ba5f10414bef7f6a05a9b3f00edacb18ebacef2b99485db9e2ee18f0e8",
+      "extract": "jdk-17.0.20.1+1"
+    },
+    {
+      "name": "robovm-dist-3.0.0-20260924.074901-5.tar.gz",
+      "url": "https://central.sonatype.com/repository/maven-snapshots/com/mobidevelop/robovm/robovm-dist/3.0.0-SNAPSHOT/robovm-dist-3.0.0-20260924.074901-5.tar.gz",
+      "sha256": "1c768091b1a5aedbc9274ba3ad4dab003aa02db844496cf35ace7ecae7d6c87d",
+      "extract": "robovm-3.0.0-SNAPSHOT"
+    },
+    {
+      "name": "jvmdowngrader-2.0.1-all.jar",
+      "url": "https://github.com/unimined/JvmDowngrader/releases/download/2.0.1/jvmdowngrader-2.0.1-all.jar",
+      "sha256": "60a5bd57846fb4be1756fb93e6f63b3d9a63c2759a63e763c44553b086326107"
+    },
+    {
+      "name": "bcprov-jdk18on-1.86.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/bouncycastle/bcprov-jdk18on/1.86/bcprov-jdk18on-1.86.jar",
+      "sha256": "2af190b300cbb0b35e248ccf5f4a06b6072030aeb3da7a98ec73abe5b4cb371f"
+    },
+    {
+      "name": "gdx-backend-robovm-metalangle-1.14.2.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/badlogicgames/gdx/gdx-backend-robovm-metalangle/1.14.2/gdx-backend-robovm-metalangle-1.14.2.jar",
+      "sha256": "1ab70904b754e17e7b20f5a00d693ed85dc32b439f74d32d04acc0a3ebc94ce4"
+    },
+    {
+      "name": "gdx-platform-1.14.2-natives-ios.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/badlogicgames/gdx/gdx-platform/1.14.2/gdx-platform-1.14.2-natives-ios.jar",
+      "sha256": "66bfbed001e75e51974b1055119d309f635b6fa25fc17e65bdd5f006ce873dd8"
+    },
+    {
+      "name": "gdx-freetype-platform-1.14.2-natives-ios.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/badlogicgames/gdx/gdx-freetype-platform/1.14.2/gdx-freetype-platform-1.14.2-natives-ios.jar",
+      "sha256": "5fbcd8eae87ef0224bdfa48f5f98c8901ac600aa53c034e55fc3ec3253d765a1"
+    },
+    {
+      "name": "sqlite-amalgamation-3510100.zip",
+      "url": "https://www.sqlite.org/2025/sqlite-amalgamation-3510100.zip",
+      "sha256": "84a85d6a1b920234349f01720912c12391a4f0cb5cb998087e641dee3ef8ef2e"
+    },
+    {
+      "name": "NativeDB.c",
+      "url": "https://raw.githubusercontent.com/xerial/sqlite-jdbc/3.51.1.0/src/main/java/org/sqlite/core/NativeDB.c",
+      "sha256": "1a695760a4bdf8d1a9b50a899b0fad18a87168c1b24de2fb6404b680d44ce31f"
+    },
+    {
+      "name": "NativeDB.java",
+      "url": "https://raw.githubusercontent.com/xerial/sqlite-jdbc/3.51.1.0/src/main/java/org/sqlite/core/NativeDB.java",
+      "sha256": "68d0d9aae5f51828b1c22ecb1d69f6d6079ac35fd12e01135921023b0d7e1c28"
+    },
+    {
+      "name": "Executor.java",
+      "url": "https://raw.githubusercontent.com/MobiVM/robovm/6d97fcec3112d4da6e1087fd0f0bc670a24e41d8/compiler/compiler/src/main/java/org/robovm/compiler/util/Executor.java",
+      "sha256": "aac3aff97232661a48f36e0eca0062eba607aa8e8381873a45a028e4cc2d9b9b"
+    }
+  ]
+}
