@@ -61,7 +61,8 @@ def main():
     # Desktop launchers, CEF video document handler and native browser bridge
     # are not runtime dependencies of the UIKit video surface.
     excluded.update("com/tonikelope/coronapoker/gdx/" + name + ".java" for name in (
-        "CardRenderLabLauncher", "PokerVideoPage", "GdxScreenshotReadback"))
+        "CardRenderLabLauncher", "PokerVideoPage", "GdxScreenshotReadback", "GdxBrowserKeyboard", "PokerChromium", "LibGdxCefBrowser"))
+    excluded.add("org/cef/browser/LibGdxCefBrowser.java")
     sources = []
     for module in ["coronapoker-core", "coronapoker-gdx"]:
         base = ROOT / "modules" / module / "src/main/java"
@@ -106,7 +107,7 @@ def main():
     sdk_version = args.sdk_version or subprocess.check_output(
         ["xcrun", "--sdk", sdk_name, "--show-sdk-version"], text=True).strip()
     platform_objects = []
-    for source in ("ios_platform.m", "gc_contract.m", "music_clock.m", "poker_video.m"):
+    for source in ("ios_platform.m", "gc_contract.m", "music_clock.m", "poker_video.m", "web_panel.m"):
         platform_object = BUILD / (Path(source).stem + ".o")
         run("xcrun", "--sdk", sdk_name, "clang", "-target", triple, "-isysroot", sdk_path,
             "-O2", "-fobjc-arc", *(["-DCP_REGISTERED_GC=1"] if args.gc_policy == "registered" else []),
@@ -121,7 +122,7 @@ def main():
         # Export only our static JNI. Exporting generated GDX weak fallbacks
         # shadows the real framework JNI and recursively calls IOSGLES20.init.
         ("exportedSymbols", "symbol", ["Java_org_sqlite_core_NativeDB_*", "Java_com_tonikelope_coronapoker_ios_*"]),
-        ("frameworks", "framework", ["UIKit", "Foundation", "CoreGraphics", "AVFoundation", "Security", "UniformTypeIdentifiers", "WebKit"]),
+        ("frameworks", "framework", ["UIKit", "Foundation", "CoreGraphics", "AVFoundation", "Security", "UniformTypeIdentifiers", "WebKit", "ImageIO"]),
         ("forceLinkClasses", "pattern", ["com.tonikelope.coronapoker.ios.**", "com.tonikelope.coronapoker.gdx.IOSGdxLauncher", "org.sqlite.**", "com.badlogic.gdx.graphics.g3d.particles.**"] )]:
         parent = ET.SubElement(config, tag)
         for value in values: ET.SubElement(parent, child).text = value

@@ -5,6 +5,7 @@ import json
 import re
 from pathlib import Path
 from prepare_graphics_sources import card_shell
+import prepare_web_sources as web
 from prepare_video_sources import prepare_overlay, prepare_search
 from prepare_scene_sources import prepare_scene
 from prepare_cinematics_sources import prepare_streaming
@@ -222,6 +223,14 @@ def prepare():
     (PORT / "validation").mkdir(parents=True, exist_ok=True)
     results = []
     def emit(original, text):
+        if original.name == "GdxFrontendScreen.java":
+            text = web.frontend(text)
+        if original.name in ("GdxFrontendScreen.java", "CoronaPokerGdxTable.java"):
+            text = text.replace("PokerChromium.available()", "PokerVideoPlatformSupport.isAvailable()")
+            def web_frame(method):
+                head, body = method.split("{", 1)
+                return head + "{ IOSWebPanel.beginFrame(); try {" + body[:-1] + "} finally { IOSWebPanel.endFrame(); } }"
+            text = replace_method(text, "    public void render()", web_frame)
         text = text.replace("Gdx.audio.newSound(", "com.tonikelope.coronapoker.ios.ProfiledSound.create(")
         source_root = next(parent for parent in original.parents if parent.name == "java")
         target = GENERATED / original.relative_to(source_root)
@@ -231,6 +240,13 @@ def prepare():
                         "originalSHA256": hashlib.sha256(original.read_bytes()).hexdigest(),
                         "mobileSHA256": hashlib.sha256(text.encode()).hexdigest()})
 
+    for name in ("GdxRobertRulesWindow", "GdxImageGalleryWindow"):
+        path = GDX / (name + ".java")
+        emit(path, web.windows(name, path.read_text()))
+    path = GDX / "PokerStatsBrowser.java"
+    emit(path, web.stats(path.read_text()))
+    path = GDX / "PokerImageGalleryBrowser.java"
+    emit(path, web.gallery(path.read_text()))
     card = GDX / "GdxCardShell.java"
     emit(card, card_shell(card.read_text()))
     shadows = GDX / "GdxFlyingChipShadows.java"
