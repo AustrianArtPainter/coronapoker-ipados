@@ -427,6 +427,12 @@ python3 ports/ios/tools/test_scene_evidence.py
 
 以下是开发过程中的匿名摘要，原始设备日志、数据库和个人签名制品不公开。
 
+### 27.90 build 23 verification (2026-11-21)
+
+The iPad simulator played a YouTube video inside the game, displayed statistics from 208 hands across 17 sessions, rendered the 58-page Spanish rulebook, and returned live image-search results. Saving a search result added its preview to the gallery's favorites.
+
+The simulator joined an unmodified 27.90 desktop core for one completed hand. With the simulator hosting, the same desktop core completed two hands and recorded two signed actions. During that run the simulator entered the background with music playing and resumed to the two-hand summary after unlock. The adapted game's 245 cryptography tests passed on the host JVM. Perceived audio and frame pacing on the physical iPad remain part of user acceptance.
+
 ### 26.16 upgrade verification (2026-10-16)
 
 The port is pinned to upstream `v26.16`, commit
