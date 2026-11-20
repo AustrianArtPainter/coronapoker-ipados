@@ -4,33 +4,20 @@
     private final TextItem[] mobileMenuTextItems = new TextItem[MOBILE_MENU_TEXT_CAPACITY];
     private int mobileMenuTextCursor;
 
-    private TextItem mobileTextItem(BitmapFont font, String value, float x, float y,
-            Color color, boolean centered, boolean italic) {
-        return mobileTextItem(font, value, x, y, color, centered, italic, 1f, false);
-    }
-
-    private TextItem mobileTextItem(BitmapFont font, String value, float x, float y,
-            Color color, boolean centered, boolean italic, float scale) {
-        return mobileTextItem(font, value, x, y, color, centered, italic, scale, false);
-    }
-
-    private TextItem mobileTextItem(BitmapFont font, String value, float x, float y,
-            Color color, boolean centered, boolean italic, float scale, boolean pixelSnapped) {
+    private TextItem mobileTextItem(BitmapFont font, String value, float x, float y, Color color, boolean centered) {
         if (mobileDrawingMainMenu) {
             for (TextItem item : mobileMenuTextItems) {
                 if (item != null && item.font == font && Objects.equals(item.text, value)
                         && mobileSameTextFloat(item.x, x) && mobileSameTextFloat(item.y, y)
-                        && mobileSameTextFloat(item.scale, scale)
                         && mobileSameTextFloat(item.color.r, color.r)
                         && mobileSameTextFloat(item.color.g, color.g)
                         && mobileSameTextFloat(item.color.b, color.b)
                         && mobileSameTextFloat(item.color.a, color.a)
-                        && item.centered == centered && item.italic == italic
-                        && item.pixelSnapped == pixelSnapped) return item;
+                        && item.centered == centered) return item;
             }
         }
         TextItem item = new TextItem(font, value, x, y, new Color(color),
-                centered, italic, scale, pixelSnapped);
+                centered);
         if (mobileDrawingMainMenu) {
             mobileMenuTextItems[mobileMenuTextCursor] = item;
             mobileMenuTextCursor = (mobileMenuTextCursor + 1) & (MOBILE_MENU_TEXT_CAPACITY - 1);
@@ -87,7 +74,7 @@
                     && mobileSameTextFloat(hit.bounds.width, width) && mobileSameTextFloat(hit.bounds.height, height))
                 return hit;
         }
-        Hit hit = new Hit(clippedSettingsHit(x, y, width, height), action, false);
+        Hit hit = new Hit(clippedSettingsHit(x, y, width, height), action, HitActivation.RELEASE);
         mobileMenuHits[mobileMenuHitCursor] = hit;
         mobileMenuHitCursor = (mobileMenuHitCursor + 1) & 15;
         return hit;
@@ -136,7 +123,7 @@
             return item;
         // The original fitting algorithm remains the miss oracle. This helper
         // is called after main-menu drawing, outside its temporary text scope.
-        item = fittedTextItem(font, text, x, y, color, false, maxWidth, false);
+        item = fittedTextItem(font, text, x, y, color, false, maxWidth);
         mobileMenuVersionItem = item;
         mobileMenuVersionFont = font;
         mobileMenuVersionFontData = data;

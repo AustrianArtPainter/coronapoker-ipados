@@ -4,6 +4,8 @@ import hashlib
 import json
 import re
 from pathlib import Path
+from prepare_graphics_sources import card_shell
+from prepare_video_sources import prepare_overlay, prepare_search
 from prepare_scene_sources import prepare_scene
 from prepare_cinematics_sources import prepare_streaming
 from prepare_table_queries import prepare as prepare_table_queries
@@ -229,6 +231,14 @@ def prepare():
                         "originalSHA256": hashlib.sha256(original.read_bytes()).hexdigest(),
                         "mobileSHA256": hashlib.sha256(text.encode()).hexdigest()})
 
+    card = GDX / "GdxCardShell.java"
+    emit(card, card_shell(card.read_text()))
+    shadows = GDX / "GdxFlyingChipShadows.java"
+    emit(shadows, clean_imports(shadows.read_text(), ["org.lwjgl."]).replace("GL11C.glIsEnabled", "Gdx.gl.glIsEnabled"))
+    video = GDX / "PokerVideoOverlay.java"
+    emit(video, prepare_overlay(video.read_text(), replace_method))
+    search = GDX / "PokerVideoSearch.java"
+    emit(search, prepare_search(search.read_text(), replace_method))
     # v27.90 keeps field elements in canonical limbs across operations. Compile
     # its field and point implementations together without the older substitutions.
     # GameAsync executes protocol orchestration, sleeps and clock deadlines.
@@ -667,6 +677,12 @@ def prepare():
 
     original = GDX / "GdxApplicationShell.java"
     text = replace_method(original.read_text(), "    private void scheduleJvmSplashClose(", "    private void scheduleJvmSplashClose() { splashCloseScheduled = true; }")
+    text = clean_imports(text, ["org.lwjgl.opengl."])
+    text = replace_method(text, "    static int defaultFramebufferSamples()", """    static int defaultFramebufferSamples() {
+        java.nio.IntBuffer value = com.badlogic.gdx.utils.BufferUtils.newIntBuffer(1);
+        Gdx.gl.glGetIntegerv(com.badlogic.gdx.graphics.GL20.GL_SAMPLES, value);
+        return Math.max(0, value.get(0));
+    }""")
     text = replace_method(text, "    private void updateForegroundFrameRate(", '''    private void updateForegroundFrameRate(float delta) {
         int target = presentationSettings.effectiveFrameRateLimit(refreshRate > 0 ? refreshRate : 60);
         if (target != appliedForegroundFps) { com.tonikelope.coronapoker.ios.IOSPlatform.setFrameRate(target); appliedForegroundFps = target; }
@@ -681,7 +697,7 @@ def prepare():
     void mobileValidationLobby(LobbySession opened) {
         application.sessionOpened(); lobby = opened; menu.openLobby(lobby); awaitTable(lobby);
     }
-    @Override public void pause() { GdxTableRenderer.suspendAll(); }
+    @Override public void pause() { PokerVideoRuntime.background(); GdxTableRenderer.suspendAll(); }
     @Override public void resume() {
         Gdx.app.postRunnable(GdxTableRenderer::resumeAll);
     }
@@ -692,6 +708,7 @@ def prepare():
 
     original = GDX / "GdxFrontendScreen.java"
     text = clean_imports(original.read_text(), ["java.awt."])
+    text = text.replace("        pokerVideoOverlay.prepareFrame();", "")
     text = physical_scissors(text, 1)
     # Production quote reuse, with the original algorithm retained for exact
     # flag 0. Fonts and the original TextItem/draw path retain their ownership.
