@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Original table UI with a pure ordered projection while UIKit is suspended. */
 public final class GdxTableRenderer implements TableRenderer {
+    static final int MAX_EVENTS_PER_FRAME = 8;
     private static final Executor COMPLETIONS = Executors.newCachedThreadPool(task -> {
         Thread worker = new Thread(task, "coronapoker-ios-visual-completion");
         worker.setDaemon(true); return worker;

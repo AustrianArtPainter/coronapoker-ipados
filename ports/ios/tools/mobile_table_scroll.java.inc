@@ -5,7 +5,7 @@
     private boolean mobileUiPressBlocked;
     private void mobileBeginContentScroll(int sx, int sy, int p, int button) {
         if (mobileScroll == null || button != Input.Buttons.LEFT || p != 0
-                || isClientTransportReconnecting() || tableImageClearConfirmation
+                || isClientTransportReconnecting() || tableGallery.isOpen()
                 || tableIdentityDialog != null || blocksTableUtilities(activeDialog)
                 || voiceNotesOpen || recoveryStopBarrier != null) return;
         pointer.set(sx, sy); viewport.unproject(pointer);
@@ -23,7 +23,7 @@
                     && settingsDebugArea().viewport().contains(pointer)
                     && !settingsDebugTrackContains(pointer.x, pointer.y)
                     && mobileSettingsDebugMaximumScroll() > 0f) target = 2;
-        } else if (uiLayer == UI_CHAT && !chatImageMode && !chatEditMenuOpen
+        } else if (uiLayer == UI_CHAT && !tableGallery.isOpen() && !chatEditMenuOpen
                 && quickChatScrollMaximum > 0f && quickChatHistoryBounds().contains(pointer)
                 && !quickChatScrollTrackContains(pointer.x, pointer.y)) target = 3;
         else if (uiLayer == UI_GAME_LOG && !gameLogEditMenuOpen
@@ -92,7 +92,7 @@
     private boolean mobileContentScrollValid() {
         return uiLayer == mobileScrollLayer && !isClientTransportReconnecting()
                 && !blocksTableUtilities(activeDialog) && tableIdentityDialog == null
-                && !tableImageClearConfirmation && !voiceNotesOpen && recoveryStopBarrier == null
+                && !tableGallery.isOpen() && !voiceNotesOpen && recoveryStopBarrier == null
                 && !chatEditMenuOpen && !gameLogEditMenuOpen;
     }
     private static float mobileOffset(float value, float delta, float maximum) {

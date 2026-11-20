@@ -61,7 +61,7 @@ def main():
     # Desktop launchers, CEF video document handler and native browser bridge
     # are not runtime dependencies of the UIKit video surface.
     excluded.update("com/tonikelope/coronapoker/gdx/" + name + ".java" for name in (
-        "CardRenderLabLauncher", "PokerVideoPage", "GdxScreenshotReadback", "GdxBrowserKeyboard", "PokerChromium", "LibGdxCefBrowser"))
+        "CardRenderLabLauncher", "PokerVideoPage", "GdxScreenshotReadback", "GdxBrowserKeyboard", "GdxProfileExportWindow", "PokerChromium", "LibGdxCefBrowser"))
     excluded.add("org/cef/browser/LibGdxCefBrowser.java")
     sources = []
     for module in ["coronapoker-core", "coronapoker-gdx"]:

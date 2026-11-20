@@ -12,6 +12,9 @@ final class GdxVoiceRecorder {
     static final int MAX_SECONDS = 15, MIN_MILLIS = 100, TAIL_MILLIS = 250;
     private final boolean automaticGain;
     private final String input;
+    private static final Object DEVICE = new Object();
+    private static GdxVoiceRecorder owner;
+    private volatile boolean cancelled;
     private volatile boolean recording;
     private volatile Outcome outcome = Outcome.ABORTED;
     private volatile long capturedMillis;
@@ -23,8 +26,13 @@ final class GdxVoiceRecorder {
     }
     Outcome start(Runnable onLive, Runnable onEnded) {
         try {
-            if (!IOSPlatform.startMicrophone(input)) return outcome = Outcome.NO_LINE;
-            recording = true; outcome = Outcome.RECORDING;
+            synchronized (DEVICE) {
+                if (cancelled) return Outcome.ABORTED;
+                if (owner != null || !IOSPlatform.startMicrophone(input)) return outcome = Outcome.NO_LINE;
+                if (cancelled) { IOSPlatform.abortMicrophone(); return Outcome.ABORTED; }
+                owner = this;
+                recording = true; outcome = Outcome.RECORDING;
+            }
             if (onLive != null) onLive.run();
             watcher = new Thread(() -> {
                 long deadline = System.nanoTime() + MAX_SECONDS * 1_000_000_000L;
@@ -45,7 +53,11 @@ final class GdxVoiceRecorder {
             capturedMillis = Math.max(capturedMillis, Math.round(IOSPlatform.microphoneSeconds() * 1000));
             recording = false;
             if (watcher != null) watcher.interrupt();
-            byte[] wave = IOSPlatform.stopMicrophone();
+            byte[] wave;
+            synchronized (DEVICE) {
+                if (owner != this || cancelled) return null;
+                try { wave = IOSPlatform.stopMicrophone(); } finally { owner = null; }
+            }
             if (wave == null) { outcome = Outcome.LOST; return null; }
             byte[] pcm = PortableWave.pcmFromWave(wave);
             if (pcm.length < 3200) { outcome = Outcome.EMPTY; return null; }
@@ -63,10 +75,17 @@ final class GdxVoiceRecorder {
     }
     Outcome outcome() { return outcome; }
     boolean isRecording() { return recording; }
+    void requestAbort() {
+        cancelled = true;
+        java.util.concurrent.CompletableFuture.runAsync(this::abort);
+    }
     void abort() {
+        cancelled = true;
         recording = false; outcome = Outcome.ABORTED;
         if (watcher != null) watcher.interrupt();
-        IOSPlatform.abortMicrophone();
+        synchronized (DEVICE) {
+            if (owner == this) { IOSPlatform.abortMicrophone(); owner = null; }
+        }
     }
     private static int peakAmplitude(byte[] bytes) {
         int peak = 0;

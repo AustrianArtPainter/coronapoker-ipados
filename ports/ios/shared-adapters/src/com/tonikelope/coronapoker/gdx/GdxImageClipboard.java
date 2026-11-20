@@ -7,6 +7,9 @@ import java.nio.file.Path;
 
 /** Publish the actual screenshot image to the native iOS pasteboard. */
 final class GdxImageClipboard {
+    static final java.util.concurrent.Executor COPY_EXECUTOR = java.util.concurrent.Executors.newSingleThreadExecutor(task -> {
+        Thread thread = new Thread(task,"iPad-clipboard"); thread.setDaemon(true); return thread;
+    });
     static void prepare(Path file) { /* UIImage decoding is bounded by the screenshot dimensions. */ }
     static boolean copy(Path file) throws IOException {
         if (file == null) return false;

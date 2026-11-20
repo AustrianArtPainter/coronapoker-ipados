@@ -225,6 +225,15 @@ def prepare():
     def emit(original, text):
         if original.name == "GdxFrontendScreen.java":
             text = web.frontend(text)
+            text = text.replace("import javax.imageio.ImageIO;", "import java.awt.event.MouseEvent;\nimport java.awt.event.KeyEvent;")
+            text = replace_method(text, "    private static Pixmap decodeAvatarCropPixmap(", '''    private static Pixmap decodeAvatarCropPixmap(Path selected) throws IOException {
+        try { return new Pixmap(Gdx.files.absolute(selected.toAbsolutePath().toString())); }
+        catch (RuntimeException invalid) { throw new IOException("Unsupported avatar image",invalid); }
+    }''')
+        if original.name == "CoronaPokerGdxTable.java":
+            text = text.replace("active.animation.failed()", "!active.animation.ready()")
+            text = text.replace("animation.fullyPreloaded() ? \"preloaded\" : \"stream\"", "\"preloaded\"")
+            text = text.replace("animation.preloadedByteCount()", "animation.gpuBytes()")
         if original.name in ("GdxFrontendScreen.java", "CoronaPokerGdxTable.java"):
             text = text.replace("PokerChromium.available()", "PokerVideoPlatformSupport.isAvailable()")
             def web_frame(method):
@@ -247,6 +256,17 @@ def prepare():
     emit(path, web.stats(path.read_text()))
     path = GDX / "PokerImageGalleryBrowser.java"
     emit(path, web.gallery(path.read_text()))
+    for name in ("GdxTextKeyRepeat","GdxVolumeKeyRepeat"):
+        path = GDX / (name + ".java")
+        source = clean_imports(path.read_text(), ["com.badlogic.gdx.backends.lwjgl3."])
+        emit(path, re.sub(r"!\(Gdx.graphics instanceof Lwjgl3Graphics desktop\)\s*\|\| desktop.getWindow\(\).isFocused\(\)",
+                          "!GdxTableRenderer.suspendedProjection()", source))
+    preview = GDX / "GdxScreenshotPreview.java"
+    source = clean_imports(preview.read_text(), ["org.lwjgl.stb."])
+    start = source.index("            int layout = switch")
+    fallback = source.index("                resized.setBlending", start)
+    end = source.index("            }\n",fallback)
+    emit(preview, source[:start] + source[fallback:end] + source[end+14:])
     card = GDX / "GdxCardShell.java"
     emit(card, card_shell(card.read_text()))
     shadows = GDX / "GdxFlyingChipShadows.java"
@@ -556,8 +576,8 @@ def prepare():
     text = text.replace("Gdx.audio.newMusic(", "com.tonikelope.coronapoker.ios.IOSMusic.create(")
     # A shuffle is a table-owned, fully uploaded sequence. No decoder or GL
     # texture update survives into its playback/render path.
-    text = text.replace("CompletableFuture<StreamingGifTextureAnimation.PreparedLooping>",
-                        "CompletableFuture<PreloadedShuffleAnimation>")
+    text = re.sub(r"CompletableFuture<StreamingGifTextureAnimation.PreparedLooping>(?=\s+(?:shufflePreparation;|preparation = shufflePreparation;))",
+                  "CompletableFuture<PreloadedShuffleAnimation>", text)
     text = text.replace("private StreamingGifTextureAnimation.PreparedLooping preparedShuffle;",
                         "private PreloadedShuffleAnimation.Prepared preparedShuffle;")
     text = text.replace("private final class LiveShuffle {\n\n        final StreamingGifTextureAnimation animation;",
@@ -713,7 +733,7 @@ def prepare():
     mobile_table = (PORT / "tools/mobile_table_methods.java.inc").read_text() + (PORT / "tools/mobile_table_scroll.java.inc").read_text() + (PORT / "tools/mobile_shuffle.java.inc").read_text()
     mobile_table = mobile_table.replace("liveShuffle.animation.dispose();", "/* Table owns the cached shuffle. */")
     text = text[:text.rfind("}")] + mobile_table + "}\n"
-    text = text.replace("    public void render() {", "    public void render() {\n        if (mobileResumeRequired) GdxTableRenderer.resumeAll();\n        mobilePreparePendingShuffle();\n        com.tonikelope.coronapoker.ios.IOSKeyboard.visible((activeDialog != null && activeDialog.isAutoCall()) || (uiLayer == UI_CHAT && !chatImageMode && !blocksTableUtilities(activeDialog)));\n        com.tonikelope.coronapoker.ios.IOSKeyboard.fit(viewport);\n        mobileUpdateTextHold();")
+    text = text.replace("    public void render() {", "    public void render() {\n        if (mobileResumeRequired) GdxTableRenderer.resumeAll();\n        mobilePreparePendingShuffle();\n        com.tonikelope.coronapoker.ios.IOSKeyboard.visible((activeDialog != null && activeDialog.isAutoCall()) || (uiLayer == UI_CHAT && !tableGallery.isOpen() && !blocksTableUtilities(activeDialog)));\n        com.tonikelope.coronapoker.ios.IOSKeyboard.fit(viewport);\n        mobileUpdateTextHold();")
     text = replace_method(text, "    public void render()", lambda method: method[:method.index("{") + 1] + "\n        try {" + method[method.index("{") + 1:-1] + "\n        } finally { if (!mobileScroll.active()) mobileUiPressBlocked = false; }\n    }")
     text = prepare_table_queries(text)
     text = prepare_scene(text, replace_method, PORT)

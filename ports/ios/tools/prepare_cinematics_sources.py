@@ -73,8 +73,4 @@ def prepare_table(source, replace_method, port):
             raise RuntimeError("Cinematic disposal ownership changed: " + signature)
         source = replace_method(source, signature, lambda method:
             method[:method.index("{")+1] + "\n        mobileAllInAssets.dispose();" + method[method.index("{")+1:])
-    source = replace_method(source, "    void disposeFailedCreation()", lambda method:
-        method.replace("        mobileAllInAssets.dispose();", """        mobileAllInAssets.dispose();
-        for (Sound sound : liveCinematicSounds.values()) disposeSafely(sound);
-        liveCinematicSounds.clear();"""))
     return source[:source.rfind("}")] + (port / "tools/mobile_cinematics.java.inc").read_text() + "}\n"

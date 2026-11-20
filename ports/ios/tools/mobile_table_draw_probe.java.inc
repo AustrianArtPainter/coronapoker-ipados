@@ -42,7 +42,6 @@
         com.tonikelope.coronapoker.ios.TableDrawProbe.measure("showdownHover", () -> updateLiveShowdownHover(width));
         com.tonikelope.coronapoker.ios.TableDrawProbe.measure("callCostOverlay", () -> drawCallCostOverlay(tableCx, tableCy, tableW));
         com.tonikelope.coronapoker.ios.TableDrawProbe.measure("handOverlay", this::drawHandOverlay);
-        com.tonikelope.coronapoker.ios.TableDrawProbe.measure("showdownOverlay", this::drawShowdownOverlay);
         com.tonikelope.coronapoker.ios.TableDrawProbe.measure("chatNotices", this::drawSeatChatNotices);
         com.tonikelope.coronapoker.ios.TableDrawProbe.measure("noopEnd", () -> {});
         com.tonikelope.coronapoker.ios.TableDrawProbe.save();

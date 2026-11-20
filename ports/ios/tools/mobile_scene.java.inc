@@ -117,10 +117,7 @@
             seat.positionX = mobileSeatBase[offset + 6]; seat.positionY = mobileSeatBase[offset + 7];
             if (i > 0) applyRemoteSeatMotion(seat, width, height);
         }
-        int dealerIndex = dealerSeat();
-        Seat dealer = dealerIndex < 0 ? null : seats[dealerIndex];
-        dealerSourceX = dealer == null ? width / 2f : dealer.x;
-        dealerSourceY = dealer == null ? height / 2f : dealer.y;
+        updateDealerSource(width,height);
     }
 
     private String mobileSceneSeatLabel(int index) {

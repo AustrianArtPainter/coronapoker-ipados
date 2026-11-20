@@ -401,3 +401,50 @@ JNIEXPORT jboolean JNICALL Java_com_tonikelope_coronapoker_ios_IOSPlatform_useMi
         return JNI_FALSE;
     }
 }
+
+@interface CPFilesDelegate : NSObject <UIDocumentPickerDelegate,UIAdaptivePresentationControllerDelegate>
+@property(nonatomic,strong) dispatch_semaphore_t done;
+@property(nonatomic,strong) NSURL *selected;
+@end
+@implementation CPFilesDelegate
+- (void)documentPicker:(UIDocumentPickerViewController *)picker didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
+    self.selected=urls.firstObject; dispatch_semaphore_signal(self.done);
+}
+- (void)documentPickerWasCancelled:(UIDocumentPickerViewController *)picker { dispatch_semaphore_signal(self.done); }
+- (void)presentationControllerDidDismiss:(UIPresentationController *)controller { dispatch_semaphore_signal(self.done); }
+@end
+// Only one export destination is selected at a time. Keep its security scope
+// through the user's confirmation and transfer, and release it upon reselection.
+static NSURL *CPExportFolder;
+JNIEXPORT jstring JNICALL Java_com_tonikelope_coronapoker_gdx_GdxFileChooser_pick(
+        JNIEnv *env,jclass type,jstring initial,jstring title,jstring extensions) {
+    @autoreleasepool {
+        if (NSThread.isMainThread) { CPError(env,@"File selection requires a worker"); return NULL; }
+        BOOL folder=extensions==NULL;
+        NSMutableArray<UTType *> *types=[NSMutableArray new];
+        if (folder) [types addObject:UTTypeFolder];
+        else for (NSString *ext in [CPString(env,extensions) componentsSeparatedByString:@","]) {
+            UTType *t=[UTType typeWithFilenameExtension:ext]; if (t) [types addObject:t];
+        }
+        if (!types.count) [types addObject:UTTypeData];
+        CPFilesDelegate *delegate=[CPFilesDelegate new]; delegate.done=dispatch_semaphore_create(0);
+        NSString *heading=CPString(env,title),*directory=CPString(env,initial);
+        __block BOOL presented=NO;
+        CPMain(^{
+            UIViewController *root=CPRootController();
+            if (!root || root.presentedViewController) return;
+            UIDocumentPickerViewController *picker=[[UIDocumentPickerViewController alloc] initForOpeningContentTypes:types asCopy:!folder];
+            picker.directoryURL=[NSURL fileURLWithPath:directory isDirectory:YES]; picker.title=heading;
+            picker.delegate=delegate; picker.presentationController.delegate=delegate;
+            [root presentViewController:picker animated:YES completion:nil]; presented=YES;
+        });
+        if (!presented) { CPError(env,@"Could not present Files"); return NULL; }
+        dispatch_semaphore_wait(delegate.done,DISPATCH_TIME_FOREVER);
+        NSURL *url=delegate.selected;
+        if (url && folder) {
+            [CPExportFolder stopAccessingSecurityScopedResource]; CPExportFolder=nil;
+            if ([url startAccessingSecurityScopedResource]) CPExportFolder=url;
+        }
+        return url ? CPJavaString(env,url.path):NULL;
+    }
+}

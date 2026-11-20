@@ -29,7 +29,7 @@
                     && pointer.y >= settingsDebugScrollTrack.y
                     && pointer.y <= settingsDebugScrollTrack.y + settingsDebugScrollTrack.height) target = 2;
         } else if (surface == Surface.LOBBY && !hasBlockingFrontendModal()
-                && !lobbyImageMode && !lobbyEmojiPickerOpen && lobbyChatScrollMaximum > 0f
+                && !lobbyGallery.isOpen() && !lobbyEmojiPickerOpen && lobbyChatScrollMaximum > 0f
                 && lobbyChatViewport.contains(pointer)) target = 3;
         else if (surface == Surface.STATS) {
             if (statsPicker != StatsPicker.NONE && statsPickerScrollMaximum > 0f
@@ -107,7 +107,7 @@
         if (surface != mobileScrollSurface || editMenu != null || dropdown != Dropdown.NONE) return false;
         return switch (mobileScrollTarget) {
             case 1, 2 -> isSettingsRootModal() && !settingsRestartNotice;
-            case 3 -> !hasBlockingFrontendModal() && !lobbyImageMode && !lobbyEmojiPickerOpen;
+            case 3 -> !hasBlockingFrontendModal() && !lobbyGallery.isOpen() && !lobbyEmojiPickerOpen;
             case 4 -> statsPicker != StatsPicker.NONE;
             case 5, 6, 7 -> !hasBlockingFrontendModal() || isFrontendRootModal();
             case 8 -> networkBlocksOpen;

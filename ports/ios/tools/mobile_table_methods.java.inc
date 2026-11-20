@@ -25,11 +25,11 @@
         if (!mobileTextHold.ready(Gdx.input.getX(), Gdx.input.getY(),
                 Gdx.input.isTouched(0), System.nanoTime())) return;
         if (isClientTransportReconnecting() || blocksTableUtilities(activeDialog)
-                || tableIdentityDialog != null || tableImageClearConfirmation) return;
+                || tableIdentityDialog != null || tableGallery.isOpen()) return;
         pointer.set(Gdx.input.getX(), Gdx.input.getY());
         viewport.unproject(pointer);
         if (mobileTextHoldTarget == 1 && uiLayer == UI_CHAT
-                && !chatImageMode && chatPointerSelectionDragging) {
+                && !tableGallery.isOpen() && chatPointerSelectionDragging) {
             chatEdit.focus("tableChat", chatDraft);
             if (!chatEdit.hasSelection(chatDraft)) chatEdit.selectAll(chatDraft);
             chatPointerSelectionDragging = false;
@@ -48,7 +48,7 @@
         mobileScroll.cancel();
         mobileUiPressBlocked = false;
         clearPointerRepeat();
-        textDeleteRepeat.clear();
+        textKeyRepeat.clear();
         betShortcutRepeat.clear();
         chatPointerSelectionDragging = gameLogSelectionDragging = false;
         clearTableScrollDrag();
@@ -65,7 +65,7 @@
         mobileResumeRequired = true;
         if (activeDialog != null && activeDialog.isAutoAction()) activeDialog.dismiss();
         voicePointer.clear();
-        if (voiceRecorder != null) finishVoiceRecording(true);
+        if (voiceCapture.busy()) finishVoiceRecording(true);
         com.tonikelope.coronapoker.ios.IOSKeyboard.visible(false);
     }
 

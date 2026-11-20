@@ -18,8 +18,6 @@
 
     private void mobileWarmAllInEffects() {
         if (startupIntroOnly || mobileAllInWarmed) return;
-        // Companion WAVs are assets too; never create their Sound at START.
-        for (String name : mobileAllInAssets.names()) allInCompanionSound(name);
         if (allInFireShader != null) {
             mobileClosingLayer.begin();
             try {
@@ -33,7 +31,7 @@
                     allInFireShader.setUniformf("u_seed", 0f);
                     allInFireShader.setUniformf("u_alpha", 1f);
                     allInFireShader.setUniformf("u_bloom", pass == 0 ? 1f : 0f);
-                    batch.draw(allInFireCanvas, 0f, 0f, 32f, 32f);
+                    batch.draw(solidWhiteTexture, 0f, 0f, 32f, 32f);
                     batch.end();
                 }
             } finally {
