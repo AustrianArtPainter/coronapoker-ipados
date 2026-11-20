@@ -36,5 +36,6 @@ public final class IOSPlatform {
     public static native String[] microphoneInputs();
     public static native String[] audioOutputs();
     public static native boolean useMicrophone(String uid);
+    public static native void profileTransferBusy(boolean busy);
     private IOSPlatform() {}
 }

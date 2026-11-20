@@ -82,38 +82,7 @@ public final class IOSGdxLauncher extends IOSApplication.Delegate {
                     : com.tonikelope.coronapoker.ios.IOSDiagnostics.documents().resolve("CoronaPoker");
             IOSPlatform.protectDirectory(mediaHome.toString());
             System.setProperty("coronapoker.install.dir", mediaHome.toString());
-            GdxDebugFile.install();
-            com.tonikelope.coronapoker.DebugLog.install();
-            application = CoronaPokerBootstrap.createApplication(home, false);
-            application.start(); application.menuReady();
-            PreferencesService preferences = application.service(PreferencesService.class);
-            DatabaseService database = application.service(DatabaseService.class);
-            ModMediaCatalog mod = GdxGamePresentationSettings.discoverInstalledMod();
-            GdxGamePresentationSettings presentation = new GdxGamePresentationSettings(preferences, mod);
-            configureModSounds(mod, presentation.language());
-            GdxGameText text = new GdxGameText(preferences.properties().getProperty("lenguaje", "es"));
-            GdxGameLogSink log = new GdxGameLogSink();
-            IdentityTrustStore trust = new SqlIdentityTrustStore(database);
-            StatsSyncService stats = new StatsSyncService(database,
-                    () -> Boolean.parseBoolean(preferences.properties().getProperty("sync_stats_exclude_private", "true")),
-                    () -> Boolean.parseBoolean(preferences.properties().getProperty("sync_stats_exclude_nicks_enabled", "false"))
-                            ? StatsSync.parseExcludedNicks(preferences.properties().getProperty("sync_stats_exclude_nicks", "")) : java.util.Set.of());
-            GameCinematicAssets bundledCinematics = new ClasspathGameCinematicAssets("cinematics/allin");
-            GameCinematicAssets cinematics = mod.installed()
-                    ? new ModAwareGameCinematicAssets(mod, bundledCinematics,
-                            java.util.Arrays.stream(Crupier.ALLIN_CINEMATICS.getValue()).map(entry -> (String) entry[0]).toList())
-                    : bundledCinematics;
-            CoreGameTableFactory tables = new CoreGameTableFactory(database, text, log,
-                    new GdxGameDialogSink(text), new GdxGameDecisionSink(text), presentation,
-                    cinematics, mod.installed(),
-                    preferences.properties(), trust);
-            lobby = NetworkLobbyGateway.forCurrentUser(tables, new RecoverableGameRepository(database), trust,
-                    () -> Boolean.parseBoolean(preferences.properties().getProperty("sync_stats_receive", "true")),
-                    () -> Boolean.parseBoolean(preferences.properties().getProperty("sync_stats_share", "true")), stats);
-            GdxApplicationShell shell = new GdxApplicationShell(60, application, lobby, log,
-                    presentation, text, language -> {
-                        text.setLanguage(language); configureModSounds(mod, language);
-                    }, trust);
+            Session session = new Session(home);
             IOSApplicationConfiguration config = new IOSApplicationConfiguration();
             config.orientationLandscape = true; config.orientationPortrait = false;
             config.preferredFramesPerSecond = 60; config.useAccelerometer = false;
@@ -121,18 +90,91 @@ public final class IOSGdxLauncher extends IOSApplication.Delegate {
             config.overrideRingerSwitch = true;
             if (com.tonikelope.coronapoker.ios.SilentAudio.ENABLED) {
                 config.useAudio = false;
-                return new IOSApplication(new com.tonikelope.coronapoker.ios.IOSDiagnostics(shell), config) {
+                return new IOSApplication(new com.tonikelope.coronapoker.ios.IOSDiagnostics(session), config) {
                     @Override protected com.badlogic.gdx.backends.iosrobovm.IOSAudio createAudio(IOSApplicationConfiguration ignored) {
                         return new com.tonikelope.coronapoker.ios.SilentAudio();
                     }
                 };
             }
-            return new IOSApplication(new com.tonikelope.coronapoker.ios.IOSDiagnostics(shell), config);
+            return new IOSApplication(new com.tonikelope.coronapoker.ios.IOSDiagnostics(session), config);
         } catch (Throwable failure) {
             com.tonikelope.coronapoker.ios.IOSDiagnostics.failure(failure);
             throw new IllegalStateException("Native CoronaPoker startup failed", failure);
         }
     }
+    private GdxApplicationShell openGame(Path home) {
+        GdxDebugFile.install();
+        com.tonikelope.coronapoker.DebugLog.install();
+        application = CoronaPokerBootstrap.createApplication(home, false);
+        application.start(); application.menuReady();
+        PreferencesService preferences = application.service(PreferencesService.class);
+        DatabaseService database = application.service(DatabaseService.class);
+        ModMediaCatalog mod = GdxGamePresentationSettings.discoverInstalledMod();
+        GdxGamePresentationSettings presentation = new GdxGamePresentationSettings(preferences, mod);
+        configureModSounds(mod, presentation.language());
+        GdxGameText text = new GdxGameText(preferences.properties().getProperty("lenguaje", "es"));
+        GdxGameLogSink log = new GdxGameLogSink();
+        IdentityTrustStore trust = new SqlIdentityTrustStore(database);
+        StatsSyncService stats = new StatsSyncService(database,
+                () -> Boolean.parseBoolean(preferences.properties().getProperty("sync_stats_exclude_private", "true")),
+                () -> Boolean.parseBoolean(preferences.properties().getProperty("sync_stats_exclude_nicks_enabled", "false"))
+                        ? StatsSync.parseExcludedNicks(preferences.properties().getProperty("sync_stats_exclude_nicks", "")) : java.util.Set.of());
+        GameCinematicAssets bundledCinematics = new ClasspathGameCinematicAssets("cinematics/allin");
+        GameCinematicAssets cinematics = mod.installed()
+                ? new ModAwareGameCinematicAssets(mod, bundledCinematics,
+                        java.util.Arrays.stream(Crupier.ALLIN_CINEMATICS.getValue()).map(entry -> (String) entry[0]).toList())
+                : bundledCinematics;
+        CoreGameTableFactory tables = new CoreGameTableFactory(database, text, log,
+                new GdxGameDialogSink(text), new GdxGameDecisionSink(text), presentation,
+                cinematics, mod.installed(),
+                preferences.properties(), trust);
+        lobby = NetworkLobbyGateway.forCurrentUser(tables, new RecoverableGameRepository(database), trust,
+                () -> Boolean.parseBoolean(preferences.properties().getProperty("sync_stats_receive", "true")),
+                () -> Boolean.parseBoolean(preferences.properties().getProperty("sync_stats_share", "true")), stats);
+        GdxApplicationShell shell = new GdxApplicationShell(60, application, lobby, log,
+                presentation, text, language -> {
+                    text.setLanguage(language); configureModSounds(mod, language);
+                }, trust);
+        return shell;
+    }
+
+    // The desktop closes its game and starts another JVM after a profile
+    // transfer. On UIKit restart only the game session inside the same app.
+    private final class Session extends com.badlogic.gdx.ApplicationAdapter {
+        private final Path home;
+        private GdxApplicationShell shell;
+        private boolean disposed;
+        Session(Path home) { this.home = home; shell = openGame(home); }
+        @Override public void create() { shell.create(); }
+        @Override public void resize(int w,int h) { if (shell != null) shell.resize(w,h); }
+        @Override public void pause() { if (shell != null) shell.pause(); }
+        @Override public void resume() { if (shell != null) shell.resume(); }
+        @Override public void render() {
+            if (shell == null) return;
+            shell.render();
+            var request = shell.profileBackupRequest();
+            if (request == null) return;
+            shell.dispose();
+            shell=null;
+            lobby.close(); lobby=null;
+            application.close(); application=null;
+            GdxDebugFile.close();
+            IOSPlatform.profileTransferBusy(true);
+            java.util.concurrent.CompletableFuture.supplyAsync(() ->
+                    request.run(GdxProfileBackup.profile(), progress -> {})).whenComplete((result,error) ->
+                    com.badlogic.gdx.Gdx.app.postRunnable(() -> {
+                IOSPlatform.profileTransferBusy(false);
+                if (disposed) return;
+                shell=openGame(home);
+                shell.mobileBackupResult = error == null ? result : new GdxProfileBackupTransfer.Result(
+                    "gdx.backup.failed",error.toString());
+                shell.create();
+                shell.resize(com.badlogic.gdx.Gdx.graphics.getWidth(),com.badlogic.gdx.Gdx.graphics.getHeight());
+            }));
+        }
+        @Override public void dispose() { disposed=true; if (shell != null) shell.dispose(); }
+    }
+
     private static void configureModSounds(ModMediaCatalog mod, String language) {
         if (!mod.installed()) return;
         String selected = Crupier.ALLIN_SOUNDS.containsKey(language) ? language : "es";

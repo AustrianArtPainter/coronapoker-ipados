@@ -776,6 +776,11 @@ def prepare():
     }
 ''' + "}\n"
     text = text.replace("    public void render() {", "    public void render() {\n        if (IOSFrameEvidence.ENABLED) IOSFrameEvidence.scene(startupIntro != null ? 4 : table == null ? 5 : 0, -1);\n        IOSGameValidation.visibleScene(table != null ? table.mobileVisibleScene() : startupIntro != null ? \"startup\" : \"menu\");\n        if (startupIntro == null && menu != null) {\n            IOSGameValidation.startOnce(this, sessionGateway, application.service(DatabaseService.class));\n            IOSVoiceValidation.startOnce();\n        }")
+    text = replace_method(text, "    void exitForProfileBackup(", lambda method: method.replace("        Gdx.app.exit();", ""))
+    text = text.replace("    private GdxProfileBackupTransfer.Request profileBackupRequest;",
+                        "    GdxProfileBackupTransfer.Result mobileBackupResult;\n    private GdxProfileBackupTransfer.Request profileBackupRequest;")
+    text = text.replace("var backupResult = GdxProfileBackupTransfer.Result.fromEnvironment();",
+                        "var backupResult = mobileBackupResult; mobileBackupResult = null;")
     text = prepare_shell_validation_entry(text)
     emit(original, text)
 

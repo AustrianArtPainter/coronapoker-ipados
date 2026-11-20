@@ -448,3 +448,22 @@ JNIEXPORT jstring JNICALL Java_com_tonikelope_coronapoker_gdx_GdxFileChooser_pic
         return url ? CPJavaString(env,url.path):NULL;
     }
 }
+
+JNIEXPORT void JNICALL Java_com_tonikelope_coronapoker_ios_IOSPlatform_profileTransferBusy(
+        JNIEnv *env,jclass cls,jboolean busy) {
+    static UIActivityIndicatorView *indicator;
+    CPMain(^{
+        UIView *host=CPRootController().view;
+        if (busy && !indicator) {
+            indicator=[[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleLarge];
+            indicator.frame=host.bounds;
+            indicator.autoresizingMask=UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+            indicator.backgroundColor=[UIColor colorWithWhite:0 alpha:0.6];
+            indicator.userInteractionEnabled=YES;
+            [host addSubview:indicator]; [indicator startAnimating];
+        } else if (!busy) {
+            [indicator removeFromSuperview]; indicator=nil;
+            [CPExportFolder stopAccessingSecurityScopedResource]; CPExportFolder=nil;
+        }
+    });
+}
