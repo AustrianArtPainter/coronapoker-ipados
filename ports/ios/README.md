@@ -1,7 +1,7 @@
-# CoronaPoker 26.16 — native iPadOS port
+# CoronaPoker 27.90 — native iPadOS port
 
 Unofficial port of **[tonikelope/coronapoker](https://github.com/tonikelope/coronapoker)**,
-based on **[v26.16](https://github.com/tonikelope/coronapoker/tree/v26.16)**.
+based on **[v27.90](https://github.com/tonikelope/coronapoker/tree/v27.90)**.
 The original game belongs to tonikelope and its contributors. This fork preserves
 the upstream license, credits and Git history; see [IPADOS-NOTICE.md](../../IPADOS-NOTICE.md).
 
@@ -10,7 +10,9 @@ Apple ID 签名安装。主要目标是 iPad；iPhone 实机验证目前暂停�
 
 ## Features and scope
 
-- 加入原版 **26.16** 电脑端的房间，或在 iPad 本机创建房间。
+27.90 build 23 在主页、等候室和牌桌共用游戏内视频窗口。交互统计和聊天图库沿用上游网页，规则手册使用随游戏打包的 PDF.js 和两种语言的 PDF。iPad 通过 WebKit 显示这些界面。
+
+- 加入原版 **27.90** 电脑端的房间，或在 iPad 本机创建房间。
 - 在本机离线与原版机器人对战，沿用桌面布局、牌局规则和加密协议。
 - UIKit 系统键盘、输入/退格/完成、长按剪切/粘贴、文件选择头像。
 - 原版格式的语音消息录制、发送和回放；原生截图生成及图片剪贴板。
@@ -18,7 +20,7 @@ Apple ID 签名安装。主要目标是 iPad；iPhone 实机验证目前暂停�
 - 自己的玩家超时仍按原规则：**可以免费 CHECK 就过牌，否则 FOLD**。
   不会替用户自动下注或加注；正常机器人仍使用原版策略。
 
-协议严格匹配 **26.16**。不能把其他版本直接混用。完成源码生成、主机侧
+协议严格匹配 **27.90**。不能把其他版本直接混用。完成源码生成、主机侧
 边界测试和 iPad 构建验证后，仍需由用户在真机上重新验收听感、锁屏主持、
 解锁恢复、电脑端双向联机、热加入、重购、输入和媒体功能。
 当前最低部署目标为 iOS/iPadOS **18.0**，但这只是构建目标；尚未完成
@@ -28,7 +30,7 @@ iOS 18 实机或 iPhone 实机验证。实机结果见下文，不能推广为�
 期待设备继续主持。来电、音频会话中断、系统资源限制、设备关机或系统终止
 App 都可能影响后台执行。没有借助外部电脑或服务器接管主持。
 
-当前升级分支为 `ipados-26.16`，尚未推送；以下构建命令在当前源码检出的根目录执行。
+当前升级分支为 `ipados-27.90`，尚未推送；以下构建命令在当前源码检出的根目录执行。
 
 ## Build from a fresh checkout
 
@@ -129,7 +131,7 @@ Xcode 生成的配置文件为准。参见 [Apple 的会员与设备测试说明
 ## Architecture
 
 ```text
-Original 26.16 core + libGDX desktop sources (unchanged)
+Original 27.90 core + libGDX desktop sources (unchanged)
     └─ prepare_game_sources.py: reviewed mobile source variants
          + shared-adapters/src: platform implementations
          + launcher/src: native app entry point

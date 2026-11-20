@@ -9,16 +9,16 @@ It does not imply upstream endorsement. The game rules, desktop interface,
 artwork, audio and networking originate from the upstream project and retain
 their existing authorship and notices.
 
-The port is based on upstream **v26.16**, commit
-`0c0830d3adaccbec5f3f23ba3adc092ec44df8a1`. The original game sources and Maven
+The port is based on upstream **v27.90**, commit
+`a660e6d305cdc8d3f0677607f272c9079b87eab5`. The original game sources and Maven
 modules are retained. iPad additions live in `ports/ios/`; mobile variants are
 generated during the build rather than overwriting the desktop sources.
-The original README is preserved as [README.upstream.md](README.upstream.md).
+The original README is preserved as [README.md](README.md).
 
-Modification date: **2026-10-16**. Additions include the ARM64 AOT launcher,
+Modification date: **2026-11-21**. Additions include the ARM64 AOT launcher,
 native platform adapters, build-time runtime/compiler adaptations, background
 presentation handling, touch/keyboard and media integration, signing/build
-scripts, event-driven rendering and animation preloading, foreground summary
+scripts, event-driven rendering and animation preloading, in-game WebKit video, interactive statistics, image gallery and rulebook, foreground summary
 restoration and orientation fixes, and port-specific validation tools and
 documentation. The GC native libraries retain their pinned upstream hashes.
 
