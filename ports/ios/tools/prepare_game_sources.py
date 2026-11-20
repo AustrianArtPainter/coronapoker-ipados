@@ -252,6 +252,13 @@ def prepare():
     for name in ("GdxRobertRulesWindow", "GdxImageGalleryWindow"):
         path = GDX / (name + ".java")
         emit(path, web.windows(name, path.read_text()))
+    # MobiVM's ICU regex engine already implements Unicode properties but
+    # rejects Java's UNICODE_CHARACTER_CLASS flag at initialization.
+    path = GDX / "GdxImageSearchHistory.java"
+    history = path.read_text()
+    flag = r'Pattern.compile("\\s+", Pattern.UNICODE_CHARACTER_CLASS)'
+    if history.count(flag) != 1: raise RuntimeError("Recheck gallery whitespace normalization")
+    emit(path, history.replace(flag, r'Pattern.compile("[\\p{Z}\\u0009-\\u000D\\u0085]+")'))
     path = GDX / "PokerStatsBrowser.java"
     emit(path, web.stats(path.read_text()))
     path = GDX / "PokerImageGalleryBrowser.java"
