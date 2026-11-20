@@ -750,6 +750,9 @@ def prepare():
 
     original = GDX / "GdxApplicationShell.java"
     text = replace_method(original.read_text(), "    private void scheduleJvmSplashClose(", "    private void scheduleJvmSplashClose() { splashCloseScheduled = true; }")
+    # MobiVM has no JVM management beans. The desktop watchdog otherwise throws every five seconds.
+    watchdog = text.index("        deadlockWatchdog = new JvmDeadlockWatchdog(")
+    text = text[:watchdog] + text[text.index("        DatabaseService database", watchdog):]
     text = clean_imports(text, ["org.lwjgl.opengl."])
     text = replace_method(text, "    static int defaultFramebufferSamples()", """    static int defaultFramebufferSamples() {
         java.nio.IntBuffer value = com.badlogic.gdx.utils.BufferUtils.newIntBuffer(1);
