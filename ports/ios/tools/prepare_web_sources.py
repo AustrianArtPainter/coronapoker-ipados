@@ -76,6 +76,7 @@ def frontend(source):
 def gallery(source):
     s = shared(source)
     header = s[:s.index("    private final PokerVideoFrameBuffer")]
+    header = header.replace("SEARCH_TIMEOUT = TimeUnit.SECONDS.toNanos(17)", "SEARCH_TIMEOUT = TimeUnit.SECONDS.toNanos(55)")
     workers = span(s, "    private final ScheduledThreadPoolExecutor worker", "    private final long started")
     fields = span(s, "    private int selectedSearch;", "    private CefClient client")
     constructor = span(s, "    PokerImageGalleryBrowser(", "        LibGdxCefBrowser current = browser;")

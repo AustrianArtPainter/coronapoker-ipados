@@ -121,7 +121,7 @@ final class IOSWebOrigin implements AutoCloseable {
                     public void success(String result) { future.complete(new Result(200,result)); }
                     public void failure(int code,String reason) { future.complete(new Result(code,reason)); }
                 });
-                Result result = future.get(32,TimeUnit.SECONDS);
+                Result result = future.get(document.startsWith("/image-search/") ? 60 : 32,TimeUnit.SECONDS);
                 respond(out,result.code(),Asset.text(result.body(),"text/plain; charset=utf-8"),false);
             } else if (request[0].equals("GET")) {
                 Asset asset;

@@ -121,7 +121,6 @@ static NSString *searchParameter(NSURL *url, NSString *name) {
     if (!local && action.targetFrame.isMainFrame) {
         if ([u.host isEqual:@"consent.google.com"]) self.result=@"consent";
         else if ([u.path hasPrefix:@"/sorry/"]) self.result=@"unusual";
-        else self.result=@"unavailable";
     }
     decision(local ? WKNavigationActionPolicyAllow:WKNavigationActionPolicyCancel);
 }
@@ -135,11 +134,13 @@ static NSString *searchParameter(NSURL *url, NSString *name) {
     decision(WKNavigationResponsePolicyAllow);
 }
 - (void)webView:(WKWebView *)web didStartProvisionalNavigation:(WKNavigation *)nav { self.loaded=NO; }
-- (void)webView:(WKWebView *)web didFinishNavigation:(WKNavigation *)nav {
+- (void)webView:(WKWebView *)web didCommitNavigation:(WKNavigation *)nav {
     self.loaded=[web.URL.path isEqual:@"/search"];
 }
 - (void)webView:(WKWebView *)web didFailProvisionalNavigation:(WKNavigation *)nav withError:(NSError *)e {
-    if (e.code!=NSURLErrorCancelled) self.result=@"unavailable";
+    if (e.code == NSURLErrorCancelled || ([e.domain isEqual:@"WebKitErrorDomain"] && e.code == 102)) return;
+    NSLog(@"Image search navigation failed (%@ %ld)", e.domain, (long)e.code);
+    self.result=@"unavailable";
 }
 @end
 static NSMutableDictionary<NSNumber *,CPSearchDocument *> *searches;
@@ -174,10 +175,14 @@ JNIEXPORT jstring JNICALL GALLERY(searchDocument)(JNIEnv *env,jclass cls,jlong o
     onUI(^{
         if (page.reading || !page.loaded || page.result) return;
         page.reading=YES;
-        [page.web evaluateJavaScript:@"(()=>{const html=document.documentElement.outerHTML;return html.length<=12582912?html:null})()"
+        [page.web evaluateJavaScript:@"(()=>{if(!document.body)return null;"
+            "const scripts=Array.from(document.scripts,s=>s.textContent).filter(s=>s.includes('encrypted-tbn'));"
+            "if(scripts.length){const data=scripts.join('\\n');if(data.length<=12582912)return data;}"
+            "if(document.querySelector('#captcha-form,form[action*=\"/sorry/\"],#topstuff + #search:empty'))"
+            "return document.documentElement.outerHTML.slice(0,12582912);return null})()"
                completionHandler:^(id value,NSError *error) {
             page.reading=NO;
-            page.result=[value isKindOfClass:NSString.class] ? [@"html:" stringByAppendingString:value]:@"unavailable";
+            if ([value isKindOfClass:NSString.class]) page.result=[@"html:" stringByAppendingString:value];
         }];
     });
     return NULL;
