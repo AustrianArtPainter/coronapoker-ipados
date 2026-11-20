@@ -123,11 +123,12 @@ def prepare_scene(text, replace_method, port):
         return method[:start]+'''
         // Preserve the original markup colour contract for custom names.
         if (text != null && (!font.getData().markupEnabled || text.indexOf('[')<0)) {
-            mobileSeatText.draw(font,text,batch,x,y,width,height,color,alpha);
+            mobileSeatText.draw(font,text,batch,x,y,width,height,color,alpha,viewport);
             return;
         }
 '''+method[start:]
-    text = replace_method(text, "    private void drawFittedCenteredInBox(", seat_text)
+    # Apply after the shared fitter has selected the raster font and visible text.
+    text = replace_method(text, "    private void drawCenteredInBox(", seat_text)
     text = replace_method(text, "    private void installFontProfile(", lambda method:
         method[:method.index("{")+1]+"\n        mobileClosingLayer.invalidate();"+method[method.index("{")+1:])
     for signature in ["    private void installFontProfile(", "    public void dispose()", "    void disposeFailedCreation()"]:

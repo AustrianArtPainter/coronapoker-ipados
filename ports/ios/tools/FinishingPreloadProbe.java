@@ -102,6 +102,9 @@ public final class FinishingPreloadProbe {
         }
         BitmapFont font=new BitmapFont(data,new TextureRegion(texture),false);
         var cached=new IOSFittedTextCache();
+        var viewport=new com.badlogic.gdx.utils.viewport.ScreenViewport();
+        viewport.setScreenBounds(0,0,1024,768);
+        viewport.setWorldSize(800,600);
         GlyphLayout layout=new GlyphLayout();
         Color color=new Color(.8f,.3f,.7f,1);
         for(boolean integers:new boolean[]{true,false}) {
@@ -109,21 +112,18 @@ public final class FinishingPreloadProbe {
             for(String text:new String[]{"CoronaBot$9","19.8","ALL IN","PENSANDO","9"})
                 for(float width:new float[]{210,31.7f}) for(float x:new float[]{3.2f,-8.7f}) {
                     font.setColor(color.r,color.g,color.b,.53f);layout.setText(font,text);
-                    float sx=data.scaleX,sy=data.scaleY;
-                    float fit=CoronaPokerGdxTable.fittedSingleLineScale(layout.width,layout.height,width,23);
-                    if(fit<1) { data.setScale(sx*fit,sy*fit);layout.setText(font,text); }
-                    font.draw(batch,layout,x+(width-layout.width)/2f,7.3f+(23+layout.height)/2f);
+                    GdxPixelText.draw(font,batch,layout,x+(width-layout.width)/2f,7.3f+(23+layout.height)/2f,viewport);
                     float[] expected=Arrays.copyOf(batch.vertices,batch.count);
-                    data.setScale(sx,sy);font.setColor(Color.WHITE);
-                    cached.draw(font,text,batch,x,7.3f,width,23,color,.53f);
+                    font.setColor(Color.WHITE);
+                    cached.draw(font,text,batch,x,7.3f,width,23,color,.53f,viewport);
                     require(expected.length==batch.count,"Glyph count differs");
                     for(int i=0;i<expected.length;i++)require(Float.floatToIntBits(expected[i])==Float.floatToIntBits(batch.vertices[i]),"Glyph vertex/color differs: "+i);
                 }
         }
-        for(int i=0;i<20000;i++)cached.draw(font,"19.8",batch,3.2f,7.3f,210,23,color,.53f);
+        for(int i=0;i<20000;i++)cached.draw(font,"19.8",batch,3.2f,7.3f,210,23,color,.53f,viewport);
         ThreadMXBean bean=(ThreadMXBean)ManagementFactory.getThreadMXBean();bean.setThreadAllocatedMemoryEnabled(true);
         long thread=Thread.currentThread().getId(),before=bean.getThreadAllocatedBytes(thread);
-        for(int i=0;i<100000;i++)cached.draw(font,"19.8",batch,3.2f,7.3f,210,23,color,.53f);
+        for(int i=0;i<100000;i++)cached.draw(font,"19.8",batch,3.2f,7.3f,210,23,color,.53f,viewport);
         long bytes=bean.getThreadAllocatedBytes(thread)-before;
         require(bytes==0,"Steady seat text allocated "+bytes+" bytes");
         IOSSeatLabelKey key=new IOSSeatLabelKey();key.update(1,"es","CHECK","",10,"PASAR");
@@ -132,7 +132,7 @@ public final class FinishingPreloadProbe {
         require(bean.getThreadAllocatedBytes(thread)-before==0,"Stable label key allocated");
         require(!key.matches(1,"en","CHECK","",10),"Language fails to invalidate");
         cached.clear();font.dispose();texture.dispose();
-        System.out.println("PASS seat cache: exact upstream vertices/colours under integer/fractional fitting; 100000 steady draws allocate "+bytes+" bytes");
+        System.out.println("PASS seat cache: exact upstream vertices/colours under physical pixel snapping; 100000 steady draws allocate "+bytes+" bytes");
     }
     public static final class CaptureBatch extends SpriteBatch {
         float[] vertices;int count;

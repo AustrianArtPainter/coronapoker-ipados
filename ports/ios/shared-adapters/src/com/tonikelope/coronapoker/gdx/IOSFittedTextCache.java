@@ -1,6 +1,7 @@
 package com.tonikelope.coronapoker.gdx;
 
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.utils.viewport.Viewport;
 import com.badlogic.gdx.graphics.g2d.*;
 
 /** Bounded plain-text layouts. Stable hits refill existing vertex storage, without allocation. */
@@ -10,7 +11,7 @@ final class IOSFittedTextCache {
     private long clock;
     static long builds, hits;
     void draw(BitmapFont font, String text, Batch batch, float x, float y, float width, float height,
-              Color color, float alpha) {
+              Color color, float alpha, Viewport viewport) {
         BitmapFont.BitmapFontData data=font.getData();
         float sx=data.scaleX, sy=data.scaleY;
         Entry result=null; int victim=0; long oldest=Long.MAX_VALUE;
@@ -26,12 +27,9 @@ final class IOSFittedTextCache {
             result=new Entry(font,text,width,height,sx,sy); entries[victim]=result; builds++;
         }
         result.used=++clock;
-        // Add the retained layout at the real origin to preserve the original
-        // integer-pixel rounding, including fractional scale and animation.
-        try {
-            if(result.fit<1f) data.setScale(sx*result.fit,sy*result.fit);
-            result.cache.setText(result.layout,x+(width-result.glyphWidth)/2f,y+(height+result.glyphHeight)/2f);
-        } finally { data.setScale(sx,sy); }
+        float left = GdxPixelText.snapX(x + (width - result.glyphWidth) / 2f, viewport);
+        float baseline = GdxPixelText.snapY(y + (height + result.glyphHeight) / 2f, viewport);
+        result.cache.setText(result.layout, left, baseline);
         result.tint.set(color.r,color.g,color.b,alpha);
         result.cache.tint(result.tint);
         result.cache.draw(batch);
@@ -41,23 +39,20 @@ final class IOSFittedTextCache {
     private static final class Entry {
         final BitmapFont font;
         final String text;
-        final float width,height,sx,sy,glyphWidth,glyphHeight,fit;
+        final float width,height,sx,sy,glyphWidth,glyphHeight;
         final BitmapFontCache cache;
         final GlyphLayout layout=new GlyphLayout();
         final Color tint=new Color();
         long used;
         Entry(BitmapFont font,String text,float width,float height,float sx,float sy) {
             this.font=font;this.text=text;this.width=width;this.height=height;this.sx=sx;this.sy=sy;
-            BitmapFont.BitmapFontData data=font.getData();
             Color original=new Color(font.getColor());
             try {
                 font.setColor(Color.WHITE); layout.setText(font,text);
-                fit=CoronaPokerGdxTable.fittedSingleLineScale(layout.width,layout.height,width,height);
-                if(fit<1f) { data.setScale(sx*fit,sy*fit); layout.setText(font,text); }
                 glyphWidth=layout.width; glyphHeight=layout.height;
-                cache=new BitmapFontCache(font,font.usesIntegerPositions());
+                cache=new BitmapFontCache(font,false);
                 cache.setText(layout,0,0);
-            } finally { data.setScale(sx,sy); font.setColor(original); }
+            } finally { font.setColor(original); }
         }
     }
 }
