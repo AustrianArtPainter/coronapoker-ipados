@@ -339,26 +339,48 @@ def prepare():
 
     original = GDX / "StreamingGifTextureAnimation.java"
     text = clean_imports(original.read_text(), ["java.awt.", "javax.imageio.", "org.w3c.dom."])
-    start = text.index("    static void decode(byte[] data,")
-    end = text.index("    private static String sanitizeThreadLabel", start)
-    text = text[:start] + '''    static void decode(byte[] data, String label, int maxWidth,
-            Consumer<CpuFrame> consumer, BooleanSupplier cancelled) throws IOException {
-        com.tonikelope.coronapoker.ios.PortableGif.decode(data, maxWidth,
-            frame -> consumer.accept(new CpuFrame(frame.width(), frame.height(),
-                frame.startMillis(), frame.endMillis(), frame.rgba())), cancelled);
+    # Retain upstream prefix/full/loop preparation and worker scheduling.
+    # The iOS decoder consumes the compressed bytes directly, including
+    # the bundled encrypted preview delivered by a worker-owned stream.
+    text = text.replace("ImageInputStream open()", "byte[] open()")
+    start = text.index("    private static ImageInputStream cachedInput")
+    end = text.index("    private static List<CpuFrame> decodePrefix", start)
+    text = text[:start] + '''    static byte[] progressiveInput(InputStream input) throws IOException {
+        try (input) { return input.readAllBytes(); }
     }
-    static GifTiming inspect(byte[] data, String label, int maxWidth) throws IOException {
+
+    private static void decode(DataSource source, String label, int maxWidth, int knownFrameCount,
+            int skippedOutputFrames, FrameSize outputSize, Consumer<CpuFrame> consumer,
+            BooleanSupplier cancelled) throws IOException {
+        if (skippedOutputFrames < 0) throw new IllegalArgumentException("skippedOutputFrames < 0");
+        if (cancelled.getAsBoolean()) return;
+        byte[] data = source.open();
         var info = com.tonikelope.coronapoker.ios.PortableGif.inspect(data);
-        float scale = Math.min(1f, maxWidth / (float) info.width());
-        long[] ends = new long[info.frames().size()];
-        long elapsed = 0;
-        for (int i = 0; i < ends.length; i++) { elapsed += info.frames().get(i).delayMillis(); ends[i] = elapsed; }
-        return new GifTiming(Math.max(1, Math.round(info.width() * scale)),
-            Math.max(1, Math.round(info.height() * scale)), ends, elapsed);
+        if (knownFrameCount > info.frames().size()) throw new IOException("Truncated GIF: " + label);
+        FrameSize size = outputSize != null ? outputSize
+                : new FrameSize(info.width(), info.height()).fitWithin(maxWidth, Integer.MAX_VALUE);
+        int[] index = {0};
+        com.tonikelope.coronapoker.ios.PortableGif.decode(info, data, size.width(), size.height(), frame -> {
+            if (index[0]++ >= skippedOutputFrames)
+                consumer.accept(new CpuFrame(frame.width(), frame.height(), frame.startMillis(),
+                        frame.endMillis(), frame.rgba()));
+        }, () -> cancelled.getAsBoolean() || (knownFrameCount > 0 && index[0] >= knownFrameCount), byte[]::new);
     }
 
 ''' + text[end:]
-    text = text.replace("cycleOffset += durationMs;", "cycleOffset = durationMs;")
+    text = re.sub(r"cachedInput\((data|prepared\.data(?:\(\))?|handle\.readBytes\(\)|Files\.readAllBytes\(path\))\)", r"\1", text)
+    start = text.index("    static GifTiming inspect(")
+    end = text.index("    private static String sanitizeThreadLabel", start)
+    text = text[:start] + '''    static GifTiming inspect(byte[] data, String label, int maxWidth) throws IOException {
+        var info = com.tonikelope.coronapoker.ios.PortableGif.inspect(data);
+        FrameSize size = new FrameSize(info.width(), info.height()).fitWithin(maxWidth, Integer.MAX_VALUE);
+        long[] ends = new long[info.frames().size()];
+        long elapsed = 0;
+        for (int i = 0; i < ends.length; i++) { elapsed += info.frames().get(i).delayMillis(); ends[i] = elapsed; }
+        return new GifTiming(size.width(), size.height(), ends, elapsed);
+    }
+
+''' + text[end:]
     text = replace_method(text, "    private void upload(CpuFrame frame)", lambda method:
         method[:method.index("{") + 1] + "\n        long mobileStart = com.tonikelope.coronapoker.ios.IOSPerformance.ENABLED ? System.nanoTime() : 0L;\n        try {" + method[method.index("{") + 1:-1] + "\n        } finally { if (com.tonikelope.coronapoker.ios.IOSPerformance.ENABLED) com.tonikelope.coronapoker.ios.IOSPerformance.record(\"gif.upload\", System.nanoTime() - mobileStart); }\n    }")
     text = prepare_streaming(text, replace_method)

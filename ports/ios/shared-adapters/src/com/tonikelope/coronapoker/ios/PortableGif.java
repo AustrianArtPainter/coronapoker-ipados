@@ -115,6 +115,13 @@ public final class PortableGif {
         float scale = Math.min(1f, maxWidth / (float) info.width());
         int width = Math.max(1, Math.round(info.width() * scale));
         int height = Math.max(1, Math.round(info.height() * scale));
+        decode(info, data, width, height, consumer, cancelled, acquire);
+    }
+
+    public static void decode(Info info, byte[] data, int width, int height, Consumer<Pixels> consumer,
+                              BooleanSupplier cancelled, IntFunction<byte[]> acquire) throws IOException {
+        if (width < 1 || width > info.width() || height < 1 || height > info.height())
+            throw new IOException("Invalid GIF output size");
         int[] canvas = new int[info.width() * info.height()];
         long elapsed = 0;
         for (Frame frame : info.frames()) {

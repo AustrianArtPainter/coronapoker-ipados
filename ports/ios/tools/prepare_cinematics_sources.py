@@ -31,6 +31,8 @@ def prepare_streaming(source, replace_method):
         mobilePreparedFrames = prepared;
         decoderThread = null;
         looping = false;
+        preloadedFrames = null;
+        mipMaps = false;
         frameEndMs = null;
         decodedWidth = prepared.width(); decodedHeight = prepared.height();
         durationMs = prepared.durationMillis(); decodingFinished = true;
